@@ -1,0 +1,169 @@
+# Job Alert System configuration
+# Tune this file instead of touching code. Secrets (API keys, phone numbers,
+# SMTP creds) live in environment variables / GitHub Actions secrets — see
+# .env.example — not here, except for the two non-secret contact fields below
+# which the candidate asked to be sent to directly.
+
+candidate:
+  name: "Pranav Wankhedkar"
+  # Used only as a fallback if EMAIL_TO / TWILIO_WHATSAPP_TO env vars are unset.
+  email_to: "pranav.wanya@gmail.com"
+  whatsapp_to: "+918087595673"
+  available_from: "2026-10-25"   # "late Oct / early Nov" per candidate
+  target_monthly_salary_aed: 45000
+
+search:
+  # Free-text queries sent to structured job-search sources (Adzuna etc.)
+  queries:
+    - "AI Engineering Lead"
+    - "Lead AI Engineer"
+    - "Principal AI Engineer"
+    - "AI Solutions Architect"
+    - "GenAI Lead"
+    - "Senior AI Engineer"
+    - "Senior Machine Learning Engineer"
+    - "Applied AI Lead"
+    - "Head of AI"
+    - "MLOps Lead"
+  locations:
+    # Order matters only for display; Dubai gets an extra score bonus below.
+    - "Dubai"
+    - "United Arab Emirates"
+    - "Abu Dhabi"
+    - "Sharjah"
+  primary_location: "Dubai"
+
+filters:
+  # A job title must contain at least one of these to be considered senior enough.
+  seniority_keywords:
+    - "lead"
+    - "senior"
+    - "sr."
+    - "sr "
+    - "principal"
+    - "staff"
+    - "head of"
+    - "architect"
+    - "director"
+    - "chief"
+    - "manager"
+
+  # A job must be AI/ML/engineering-related — title or description must hit one of these.
+  domain_keywords:
+    - "ai"
+    - "artificial intelligence"
+    - "machine learning"
+    - " ml "
+    - "genai"
+    - "generative ai"
+    - "llm"
+    - "large language model"
+    - "nlp"
+    - "natural language processing"
+    - "data scien"
+    - "deep learning"
+    - "mlops"
+    - "agentic"
+    - "software engineer"
+    - "backend engineer"
+    - "platform engineer"
+    - "engineering"
+
+  # Any hit here excludes the job outright, regardless of other matches.
+  exclude_keywords:
+    - "intern"
+    - "internship"
+    - "junior"
+    - "trainee"
+    - "graduate program"
+    - "fresher"
+    - "entry level"
+    - "entry-level"
+    - "part-time"
+    - "part time"
+
+  # Resume skill keywords used for match-scoring (weighted). Higher weight = more
+  # central to the candidate's actual experience (see uploaded CV).
+  skill_weights:
+    "agentic ai": 10
+    "generative ai": 9
+    "genai": 9
+    "rag": 8
+    "retrieval augmented generation": 8
+    "llm": 9
+    "large language model": 9
+    "langchain": 7
+    "prompt engineering": 6
+    "gemini": 5
+    "openai": 6
+    "python": 8
+    "pytorch": 6
+    "tensorflow": 6
+    "scikit-learn": 4
+    "xgboost": 4
+    "mlops": 7
+    "machine learning": 8
+    "nlp": 6
+    "gcp": 6
+    "google cloud": 6
+    "aws": 5
+    "databricks": 6
+    "airflow": 4
+    "fastapi": 4
+    "docker": 4
+    "etl": 5
+    "data pipeline": 5
+    "semantic search": 5
+    "hugging face": 5
+
+  # 0-100 composite score threshold required to trigger an alert.
+  min_score_to_alert: 40
+
+salary:
+  target_currency: "AED"
+  min_monthly: 45000
+  # A disclosed salary below this fraction of the target excludes the job
+  # (a 10% margin avoids dropping near-misses worth negotiating).
+  tolerance_ratio: 0.9
+  # Static approximate FX rates to AED, for normalizing salaries posted in
+  # other currencies. AED is USD-pegged (3.6725); others are approximate and
+  # should be refreshed periodically — see README.
+  fx_to_aed:
+    AED: 1.0
+    USD: 3.6725
+    SAR: 0.9793
+    QAR: 1.0089
+    OMR: 9.5485
+    BHD: 9.7407
+    KWD: 11.97
+    EUR: 3.97
+    GBP: 4.63
+    INR: 0.0442
+
+sources:
+  adzuna:
+    enabled: true
+    country: "ae"
+    results_per_query: 25
+  greenhouse:
+    enabled: true
+    # Add "board_token" values from careers.<company>.com pages that run on
+    # Greenhouse (URL pattern: boards.greenhouse.io/<token>). Empty by
+    # default — populate with companies you're targeting.
+    companies: []
+  lever:
+    enabled: true
+    # Add company slugs from jobs.lever.co/<slug>. Empty by default.
+    companies: []
+  bayt:
+    enabled: true
+    # Best-effort HTML scraper — Bayt's markup can change without notice.
+    # If it starts returning zero results, check src/scrapers/bayt.py first.
+    search_url: "https://www.bayt.com/en/uae/jobs/"
+
+digest:
+  max_jobs_whatsapp: 10
+  max_jobs_email: 30
+  notify_email_on_empty: true
+  notify_whatsapp_on_empty: false
+  notify_on_source_failure: true

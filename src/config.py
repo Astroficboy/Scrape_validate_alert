@@ -1,0 +1,59 @@
+"""Loads config/config.yaml and layers environment variables (secrets) on top."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = REPO_ROOT / "config" / "config.yaml"
+DATA_DIR = REPO_ROOT / "data"
+SEEN_JOBS_PATH = DATA_DIR / "seen_jobs.json"
+
+
+def load_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    return cfg
+
+
+class Secrets:
+    """Thin wrapper around env vars so callers can check `.available` instead
+    of scattering `os.getenv` + None-checks across the codebase."""
+
+    def __init__(self, cfg: dict[str, Any]):
+        self.adzuna_app_id = os.getenv("ADZUNA_APP_ID", "")
+        self.adzuna_app_key = os.getenv("ADZUNA_APP_KEY", "")
+
+        self.email_address = os.getenv("EMAIL_ADDRESS", "")
+        self.email_app_password = os.getenv("EMAIL_APP_PASSWORD", "")
+        self.email_to = os.getenv("EMAIL_TO") or cfg["candidate"]["email_to"]
+
+        self.twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
+        self.twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+        self.twilio_whatsapp_from = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+        self.twilio_whatsapp_to_raw = os.getenv("TWILIO_WHATSAPP_TO") or cfg["candidate"]["whatsapp_to"]
+        self.twilio_content_sid = os.getenv("TWILIO_CONTENT_SID", "")
+
+    @property
+    def twilio_whatsapp_to(self) -> str:
+        number = self.twilio_whatsapp_to_raw
+        return number if number.startswith("whatsapp:") else f"whatsapp:{number}"
+
+    @property
+    def adzuna_available(self) -> bool:
+        return bool(self.adzuna_app_id and self.adzuna_app_key)
+
+    @property
+    def email_available(self) -> bool:
+        return bool(self.email_address and self.email_app_password and self.email_to)
+
+    @property
+    def whatsapp_available(self) -> bool:
+        return bool(self.twilio_account_sid and self.twilio_auth_token and self.twilio_whatsapp_to_raw)
