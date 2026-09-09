@@ -24,6 +24,8 @@ from src.notifiers.email_notifier import send_email
 from src.notifiers.whatsapp_notifier import send_whatsapp
 from src.scrapers.adzuna import AdzunaScraper
 from src.scrapers.bayt import BaytScraper
+from src.scrapers.email_alerts import EmailAlertsScraper
+from src.scrapers.google_discovery import GoogleDiscoveryScraper
 from src.scrapers.google_watch import GoogleWatchScraper
 from src.scrapers.greenhouse import GreenhouseScraper
 from src.scrapers.lever import LeverScraper
@@ -38,12 +40,24 @@ def run() -> int:
     config = load_config()
     secrets = Secrets(config)
 
+    # Google Custom Search has one daily query budget shared between broad
+    # discovery and the priority-company watch: discovery spends first, the
+    # watch gets whatever's left (see config.yaml sources.google_search).
+    total_google_budget = config["sources"]["google_search"]["max_daily_queries"]
+    discovery_scraper = GoogleDiscoveryScraper(
+        config, secrets.google_api_key, secrets.google_cse_id, query_budget=total_google_budget
+    )
+    discovery_spend = len(discovery_scraper.queries()) if discovery_scraper.is_enabled() else 0
+    watch_budget = max(0, total_google_budget - discovery_spend)
+
     scrapers = [
+        EmailAlertsScraper(config, secrets.imap_user, secrets.imap_password),
         AdzunaScraper(config, secrets.adzuna_app_id, secrets.adzuna_app_key),
         GreenhouseScraper(config),
         LeverScraper(config),
         BaytScraper(config),
-        GoogleWatchScraper(config, secrets.google_api_key, secrets.google_cse_id),
+        discovery_scraper,
+        GoogleWatchScraper(config, secrets.google_api_key, secrets.google_cse_id, query_budget=watch_budget),
     ]
 
     all_jobs: list[JobPosting] = []

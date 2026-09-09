@@ -7,6 +7,7 @@ keyword lists and weights this module reads.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from src.models import JobPosting
 
@@ -29,6 +30,30 @@ def _matches_location(location: str, locations: list[str]) -> bool:
     return any(loc.lower() in location_l for loc in locations)
 
 
+# "5+ years", "minimum of 8 years", "8-10 years", "at least 12 yrs"
+_YEARS_RE = re.compile(
+    r"(\d{1,2})\s*(?:\+|plus)?\s*(?:-|–|to)?\s*(\d{1,2})?\s*\+?\s*(?:years?|yrs?)",
+    re.I,
+)
+
+
+def _extract_required_years(text: str) -> int | None:
+    """Largest credible 'N years experience' figure in the text, or None if
+    the posting doesn't mention a required years-of-experience figure."""
+    text_l = text.lower()
+    best = None
+    for match in _YEARS_RE.finditer(text_l):
+        window = text_l[max(0, match.start() - 60): match.end() + 60]
+        if "experience" not in window and "exp" not in window:
+            continue
+        low = int(match.group(1))
+        high = int(match.group(2)) if match.group(2) else low
+        value = min(low, high)  # the floor is what actually gates you
+        if 0 < value <= 30:
+            best = value if best is None else max(best, value)
+    return best
+
+
 def _score_skills(text: str, skill_weights: dict[str, int]) -> tuple[float, list[str]]:
     text_l = text.lower()
     total = 0
@@ -42,36 +67,58 @@ def _score_skills(text: str, skill_weights: dict[str, int]) -> tuple[float, list
     return normalized, hit_skills
 
 
-def build_priority_index(priority_targets: dict) -> list[tuple[str, str, float, str]]:
-    """Flattens config.yaml's priority_targets tiers into (name, domain,
-    bonus, tier_key) tuples for fast lookup per job."""
-    index: list[tuple[str, str, float, str]] = []
+@dataclass
+class PriorityTarget:
+    name: str
+    domain: str
+    bonus: float
+    tier: str
+
+    @property
+    def pattern(self) -> re.Pattern:
+        # Word-boundary match so "AWS" doesn't fire inside another word, and
+        # names with punctuation ("e&") don't break the regex.
+        return re.compile(rf"(?<!\w){re.escape(self.name)}(?!\w)", re.I)
+
+
+def build_priority_index(priority_targets: dict) -> list[PriorityTarget]:
+    """Flattens config.yaml's priority_targets tiers into PriorityTarget
+    entries for fast lookup per job."""
+    index: list[PriorityTarget] = []
     for tier_key, tier in (priority_targets or {}).items():
         bonus = tier.get("bonus", 0)
         for company in tier.get("companies", []):
-            name = (company.get("name") or "").strip().lower()
+            name = (company.get("name") or "").strip()
             domain = (company.get("domain") or "").strip().lower()
             if name or domain:
-                index.append((name, domain, bonus, tier_key))
+                index.append(PriorityTarget(name=name, domain=domain, bonus=bonus, tier=tier_key))
     return index
 
 
-def _priority_bonus(job: JobPosting, index: list[tuple[str, str, float, str]]) -> tuple[float, str | None, str | None]:
+def _priority_bonus(job: JobPosting, index: list[PriorityTarget]) -> tuple[float, str | None, str | None]:
     """Returns (bonus, tier_key, matched_name) for the strongest match, or
-    (0, None, None) if the job doesn't match any priority target."""
-    blob = f"{job.title} {job.company} {job.description}".lower()
-    url = (job.url or "").lower()
+    (0, None, None) if the job doesn't match any priority target.
 
-    best_bonus = 0.0
-    best_tier: str | None = None
-    best_name: str | None = None
-    for name, domain, bonus, tier_key in index:
-        matched = (name and name in blob) or (domain and domain in url)
-        if matched and (best_tier is None or bonus > best_bonus):
-            best_bonus = bonus
-            best_tier = tier_key
-            best_name = name or domain
-    return best_bonus, best_tier, best_name
+    Deliberately matches only the `company` field and the URL host — never
+    the title/description. AWS, Databricks, Oracle and Google Cloud show up
+    constantly as *required skills* in AI job postings; matching those
+    against the description would wrongly tag half the feed as "big tech".
+    A domain hit in the URL always outranks a name match (more specific
+    signal), and among name matches the longest company name wins (so "FAB"
+    can't outrank "First Abu Dhabi Bank" when both are configured).
+    """
+    url = (job.url or "").lower()
+    company = job.company or ""
+
+    by_domain = [t for t in index if t.domain and t.domain in url]
+    by_name = [t for t in index if t.name and company and t.pattern.search(company)]
+
+    pool = by_domain or by_name
+    if not pool:
+        return 0.0, None, None
+
+    best = max(pool, key=lambda t: (t.bonus, len(t.name)))
+    return best.bonus, best.tier, (best.name or best.domain)
 
 
 def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]:
@@ -81,6 +128,7 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
     filters = config["filters"]
     salary_cfg = config["salary"]
     search_cfg = config["search"]
+    candidate_cfg = config["candidate"]
 
     seniority_kw = filters["seniority_keywords"]
     domain_kw = filters["domain_keywords"]
@@ -94,6 +142,10 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
     fx_table = salary_cfg["fx_to_aed"]
     target_monthly = salary_cfg["min_monthly"]
     tolerance_ratio = salary_cfg["tolerance_ratio"]
+
+    ai_years = candidate_cfg.get("ai_years", 0)
+    total_years = candidate_cfg.get("total_years", 0)
+    years_ceiling = candidate_cfg.get("max_years_tolerated", 12)
 
     priority_index = build_priority_index(config.get("priority_targets", {}))
 
@@ -159,13 +211,43 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
         if priority_tier:
             reasons.append(f"Priority target ({priority_tier}: {priority_name}, {priority_bonus:+.0f})")
 
+        # Years-of-experience required, if the posting states one. A soft
+        # signal (never excludes) — required-but-unstated is common and
+        # shouldn't be held against a posting.
+        years_bonus = 0.0
+        required_years = _extract_required_years(blob)
+        if required_years is None:
+            years_bonus = 2
+        elif required_years <= ai_years:
+            years_bonus = 8
+            reasons.append(f"Asks {required_years}y — matches {ai_years}y hands-on AI experience")
+        elif required_years <= total_years:
+            years_bonus = 5
+            reasons.append(f"Asks {required_years}y — covered by {total_years}y total experience")
+        elif required_years <= years_ceiling:
+            years_bonus = 0
+            reasons.append(f"Asks {required_years}y experience — a stretch")
+        else:
+            years_bonus = -10
+            reasons.append(f"Asks {required_years}y experience — likely out of range")
+
         # Base score reflects that the job already cleared every hard gate
         # (senior title, AI/engineering domain, Dubai/UAE location, no
-        # disclosed salary below target). Skill overlap, salary and the
-        # priority-target bonus refine the ranking on top of that instead of
-        # being able to sink a genuine match just because a short job blurb
-        # didn't literally repeat resume keywords.
-        score = min(100.0, max(0.0, 35 + skill_score * 0.35 + location_bonus + salary_bonus + priority_bonus))
+        # disclosed salary below target). Skill overlap, salary, years-fit
+        # and the priority-target bonus refine the ranking on top of that
+        # instead of being able to sink a genuine match just because a short
+        # job blurb didn't literally repeat resume keywords.
+        score = 35 + skill_score * 0.35 + location_bonus + salary_bonus + priority_bonus + years_bonus
+
+        # Thin-data guard: a title-only posting (e.g. a bare search-result
+        # snippet) can't be trusted to outrank a fully-described real match,
+        # but a named priority-target employer is itself strong evidence, so
+        # the cap lifts by that bonus rather than burying the hit entirely.
+        if len(job.description) < 60:
+            score = min(score, 72 + max(0.0, priority_bonus))
+            reasons.append("Limited detail available — open the link to verify")
+
+        score = min(100.0, max(0.0, score))
 
         if score < min_score:
             continue

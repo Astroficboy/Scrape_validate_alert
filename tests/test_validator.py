@@ -89,6 +89,50 @@ def test_deprioritised_company_scores_lower_than_unknown(config):
         assert scores["https://example.com/job/wipro"] < scores["https://example.com/job/unknown2"]
 
 
+def test_years_within_ai_experience_boosts_score(config):
+    within = _job(
+        url="https://example.com/job/within",
+        description="Build agentic AI systems. Requires 4+ years of experience in ML.",
+    )
+    beyond = _job(
+        url="https://example.com/job/beyond",
+        description="Build agentic AI systems. Requires 20+ years of experience in ML.",
+    )
+    result = validate_and_score([beyond, within], config)
+    scores = {j.url: j.score for j in result if j.url in {"https://example.com/job/within", "https://example.com/job/beyond"}}
+    # "beyond" (20y, past max_years_tolerated=12) may or may not clear the
+    # score threshold; if present, it must rank below "within" (4y, matches
+    # ai_years=5).
+    assert "https://example.com/job/within" in scores
+    if "https://example.com/job/beyond" in scores:
+        assert scores["https://example.com/job/within"] > scores["https://example.com/job/beyond"]
+
+
+def test_unstated_years_requirement_does_not_penalise(config):
+    jobs = [_job(description="Build agentic AI and LLM/RAG systems in Python on GCP. No years stated.")]
+    result = validate_and_score(jobs, config)
+    assert len(result) == 1
+    assert not any("out of range" in r for r in result[0].reasons)
+
+
+def test_thin_data_job_is_capped_below_full_length_equivalent(config):
+    # Same skill/location signal, but one description is padded well past
+    # the 60-char thin-data threshold with more matched skill keywords.
+    thin = _job(url="https://example.com/job/thin", description="AI GCP Python")
+    rich = _job(
+        url="https://example.com/job/rich",
+        description=(
+            "Agentic AI, generative AI, RAG, LLM, LangChain, MLOps, Python, "
+            "GCP, Databricks, PyTorch, TensorFlow, semantic search, prompt "
+            "engineering, and OpenAI integration for a production platform."
+        ),
+    )
+    result = validate_and_score([thin, rich], config)
+    scores = {j.url: j.score for j in result}
+    assert scores["https://example.com/job/thin"] <= 72
+    assert scores["https://example.com/job/rich"] > scores["https://example.com/job/thin"]
+
+
 def test_results_sorted_by_score_descending(config):
     strong = _job(
         url="https://example.com/job/strong",

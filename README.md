@@ -22,6 +22,10 @@ Configured in `config/config.yaml` from the candidate's CV:
 - **Skill match:** jobs are scored against the candidate's actual skills
   (Agentic AI, GenAI, LLMs, RAG, LangChain, Python, PyTorch/TensorFlow, GCP/
   AWS, Databricks, MLOps, FastAPI, etc.) to rank the best fits first.
+- **Years of experience:** if a posting states a required years figure, it's
+  compared against `candidate.ai_years`/`total_years`/`max_years_tolerated`
+  in `config.yaml` — a soft signal (never excludes), since "years required"
+  is frequently unstated or negotiable.
 - **Priority employers:** `config.yaml`'s `priority_targets` ranks known
   high-paying/target companies (banks, the G42/sovereign-AI cluster, big
   tech regional offices, well-funded product companies) above unknown ones
@@ -39,12 +43,15 @@ size — by editing `config/config.yaml`. No code changes needed.
 ## Architecture
 
 ```
-src/scrapers/   -> Greenhouse & Lever (official public board APIs), Bayt
-                    (best-effort HTML), Google Custom Search (company watch),
-                    Adzuna (wired up but disabled — see caveat below)
+src/scrapers/   -> email_alerts (IMAP — LinkedIn/Indeed/Naukrigulf/GulfTalent/
+                    Bayt), Greenhouse & Lever (official public board APIs),
+                    google_discovery + google_watch (Google Custom Search,
+                    shared daily budget), Bayt HTML (best-effort), Adzuna
+                    (wired up but disabled — see caveat below)
 src/validator.py -> hard filters (seniority/domain/location/exclusions) +
                      0-100 quality score (skills + salary + location +
-                     priority_targets tier bonus)
+                     years-of-experience fit + priority_targets tier bonus +
+                     thin-data cap)
 src/store.py     -> data/seen_jobs.json dedup store, so only *new* postings
                      get alerted; the workflow commits it back to the repo
                      after each run since Actions runners are ephemeral
@@ -60,14 +67,23 @@ src/main.py      -> orchestrates all of the above; every scraper and every
 
 ### Why these job sources
 
-Bayt/GulfTalent/NaukriGulf/LinkedIn/Indeed HTML changes often and most are
-heavily JS-rendered or anti-bot protected, so scraping them reliably from an
-unattended daily cron job is fragile. **Adzuna was originally the primary
-source but is disabled by default** — a live test run confirmed it returns
-404 for country code `ae`; the UAE simply isn't one of Adzuna's covered
-markets, so no amount of correct credentials fixes it. Real coverage instead
-comes from:
+Direct scraping of LinkedIn, Indeed, Naukrigulf, GulfTalent and Bayt gets an
+IP blocked within days and risks the account — none of that is attempted
+here. **Adzuna was originally the intended primary API source but is
+disabled by default** — a live test run confirmed it returns 404 for
+country code `ae`; the UAE simply isn't one of Adzuna's covered markets, so
+no amount of correct credentials fixes it. Real coverage instead comes from
+four legitimate routes:
 
+- **Job-alert emails over IMAP** (`src/scrapers/email_alerts.py`) — the
+  actual route into LinkedIn and Indeed. You create a **daily email alert**
+  for each target title on each board (LinkedIn, Indeed, Naukrigulf,
+  GulfTalent, Bayt), scoped to Dubai/UAE, delivered to one inbox; this reads
+  that inbox over IMAP and parses the postings out of the alert HTML. Each
+  board hands over exactly what its own search already filtered for — no
+  scraping, no bot detection, no account risk, and it doesn't break when a
+  site redesigns. One-time setup cost: creating ~30 saved searches by hand
+  (see below).
 - **Greenhouse** / **Lever** — most tech companies' own ATS expose a public,
   unauthenticated JSON jobs API (`boards-api.greenhouse.io`, `api.lever.co`).
   `config.yaml`'s Greenhouse list is verified live (via `scripts/check_boards.py`,
@@ -75,21 +91,23 @@ comes from:
   jobs, 12 UAE), `bybit` (152 jobs, 61 UAE) — the other guessed tokens (and
   every guessed Lever slug) 404'd and were pruned. Re-run
   `python scripts/check_boards.py` after adding new candidate companies.
-- **Google Custom Search** (`src/scrapers/google_watch.py`) — most Tier-1
-  targets (banks, the G42/sovereign-AI cluster, big tech regional offices)
-  run their own careers portal (Workday, in-house), not a scrapable public
-  ATS. Instead of scraping each directly, this runs one targeted Google
-  search per `watch: true` company in `config.yaml`'s `priority_targets`,
-  restricted to that company's domain and biased toward senior AI roles in
-  Dubai/UAE. Free tier: 100 queries/day; budget-capped via
-  `sources.google_watch.daily_query_budget` (currently 16 watched companies,
-  well under the default 35 cap). Needs `GOOGLE_API_KEY` + `GOOGLE_CSE_ID`.
-- **Bayt** is included as a best-effort HTML scraper (`src/scrapers/bayt.py`)
-  since it's a major UAE job board, but cloud/datacenter IPs — including
-  GitHub Actions runners — get 403'd by its anti-bot layer more often than
-  not, on top of markup that can change without notice. Treat it as
-  opportunistic, not reliable; it's isolated from the rest of the system and
-  fails without affecting the other sources.
+- **Google Custom Search**, split into two sources sharing one daily query
+  budget (`sources.google_search.max_daily_queries`, default 90 of the free
+  100/day tier — discovery spends first, watch gets the remainder):
+  - `src/scrapers/google_discovery.py` — broad (title × suffix) search
+    across `search.queries` × `sources.google_discovery.suffixes`, catching
+    roles at companies entirely outside `priority_targets` (career pages,
+    Workday postings, ATS boards that never reach aggregators).
+  - `src/scrapers/google_watch.py` — one targeted query per `watch: true`
+    company in `priority_targets`, restricted to that company's domain.
+    Currently 16 watched companies.
+
+  Needs `GOOGLE_API_KEY` + `GOOGLE_CSE_ID`.
+- **Bayt** is also included as a best-effort HTML scraper (`src/scrapers/bayt.py`),
+  but cloud/datacenter IPs — including GitHub Actions runners — get 403'd by
+  its anti-bot layer more often than not, on top of markup that can change
+  without notice. Treat it as opportunistic, not reliable; it's isolated
+  from the rest of the system and fails without affecting the other sources.
 
 You can add more sources by writing a new class in `src/scrapers/` that
 implements `BaseScraper` (see `src/scrapers/base.py`) and wiring it into
@@ -97,32 +115,60 @@ implements `BaseScraper` (see `src/scrapers/base.py`) and wiring it into
 
 ## One-time setup
 
-### 1. Google Custom Search (free, powers the priority-company watch)
+### 1. Job-alert emails (the LinkedIn/Indeed route) — ~30-40 minutes
+
+This is the one genuinely manual step, and it's what makes LinkedIn/Indeed
+coverage possible without scraping them.
+
+1. Decide which Gmail address to use — the one already set up for
+   `EMAIL_ADDRESS`/`EMAIL_APP_PASSWORD` below works fine as a single inbox
+   that both receives board alerts and sends the digest. (A dedicated fresh
+   Gmail keeps this out of a personal inbox if you'd rather.)
+2. On each board, run the search and save it as a **daily** email alert to
+   that address, for each target title in `search.queries`
+   (`config.yaml`) crossed with Dubai/UAE as location:
+   - **LinkedIn** — Jobs → search title + location `Dubai, UAE` → toggle
+     *Job alert* on, frequency Daily. Repeat per title. Also confirm alert
+     email delivery is on in Settings → Notifications.
+   - **Indeed** (`ae.indeed.com`) — search, then "Get new jobs for this search".
+   - **Naukrigulf** (`naukrigulf.com`) — Recommended Jobs → Create job alert.
+   - **GulfTalent** — Job alerts, filter UAE + IT/Technology.
+   - **Bayt** (`bayt.com`) — worth adding, one of the largest Gulf boards.
+3. That's ~30 saved searches (titles × boards) — tedious once, but it's the
+   backbone of real LinkedIn/Indeed coverage. `sources.email_alerts.senders`
+   in `config.yaml` already maps each board's sending domain; add more there
+   if you set up additional boards (Monster Gulf, Glassdoor are pre-wired).
+4. `IMAP_USER`/`IMAP_PASSWORD` default to `EMAIL_ADDRESS`/`EMAIL_APP_PASSWORD`
+   below — only set them separately if the alerts land in a different inbox.
+
+### 2. Google Custom Search (free, powers broad discovery + the priority-company watch)
 
 1. In a Google Cloud project, enable the "Custom Search API" and create an
    API key — this is `GOOGLE_API_KEY`.
 2. Create a Programmable Search Engine at
    https://programmablesearchengine.google.com/, set it to "Search the
    entire web", and copy its Search engine ID — this is `GOOGLE_CSE_ID`.
-3. Free tier is 100 queries/day; this system uses at most
-   `sources.google_watch.daily_query_budget` (default 35) per run.
+3. Free tier is 100 queries/day; `sources.google_search.max_daily_queries`
+   (default 90) caps total spend across both Google sources.
 
-### 1b. Adzuna API (optional — currently disabled)
+### 2b. Adzuna API (optional — currently disabled)
 
 Adzuna doesn't cover the UAE (see above), so this isn't needed unless you
 also want it for another market. Register at https://developer.adzuna.com/
 for an `app_id`/`app_key` and flip `sources.adzuna.enabled` to `true` in
 `config.yaml` if you ever want it back on.
 
-### 2. Email (Gmail)
+### 3. Email (Gmail)
 
-1. Enable 2-Step Verification on the sending Gmail account.
+1. Enable 2-Step Verification on the Gmail account (the same one used for
+   job alerts above, unless you set IMAP_USER separately).
 2. Create an App Password: https://myaccount.google.com/apppasswords
 3. Use that Gmail address as `EMAIL_ADDRESS` and the 16-character app
    password as `EMAIL_APP_PASSWORD`. `EMAIL_TO` is where the digest goes
    (defaults to `pranavwankhedkar@gmail.com` from `config.yaml` if unset).
+   This same App Password also authenticates the IMAP read in step 1.
 
-### 3. WhatsApp (Twilio)
+### 4. WhatsApp (Twilio)
 
 1. Create a Twilio account: https://www.twilio.com/try-twilio
 2. Get `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` from the console.
@@ -140,17 +186,19 @@ for an `app_id`/`app_key` and flip `sources.adzuna.enabled` to `true` in
    silently stop working once the sandbox/session window lapses — email
    still works regardless.
 
-### 4. Wire it into GitHub Actions
+### 5. Wire it into GitHub Actions
 
 In the repo: **Settings → Secrets and variables → Actions → New repository
 secret**, add:
 
 ```
-GOOGLE_API_KEY
-GOOGLE_CSE_ID
 EMAIL_ADDRESS
 EMAIL_APP_PASSWORD
 EMAIL_TO                 (optional — defaults to)
+GOOGLE_API_KEY
+GOOGLE_CSE_ID
+IMAP_USER                 (optional — defaults to EMAIL_ADDRESS)
+IMAP_PASSWORD              (optional — defaults to EMAIL_APP_PASSWORD)
 TWILIO_ACCOUNT_SID
 TWILIO_AUTH_TOKEN
 TWILIO_WHATSAPP_FROM
@@ -165,20 +213,24 @@ day at 09:00 Gulf Standard Time (05:00 UTC), and can also be triggered
 manually from the Actions tab (`workflow_dispatch`). No server, no UI, no
 manual step after this.
 
-### 5. Target companies
+### 6. Target companies
 
 `config.yaml` ships pre-populated with two things, both fully editable:
 
 - `sources.greenhouse.companies` / `sources.lever.companies` — Greenhouse/
-  Lever board tokens. Most are unverified guesses; run
-  `python scripts/check_boards.py` (needs `requests`/`PyYAML`, or just run
-  the `check-boards.yml` workflow from the Actions tab) to see which
-  actually resolve, and delete the ones that don't from `config.yaml`.
+  Lever board tokens, verified live via `scripts/check_boards.py`. Add new
+  candidates freely and re-run `python scripts/check_boards.py` (or the
+  `check-boards.yml` workflow from the Actions tab) to see which resolve
+  before adding them to `config.yaml`.
 - `priority_targets` — tiered lists of target companies (banks, sovereign-AI,
   big tech, product/tech, crypto, deprioritised IT-services firms) with a
   per-tier score bonus and a `watch: true` flag for the ones worth spending
   a Google Custom Search query on each run (see above). Add, remove, or
-  re-tier companies freely — it's just data the validator reads.
+  re-tier companies freely — it's just data the validator reads. Matching is
+  restricted to the job's `company` field and URL host, deliberately never
+  the description — AWS, Databricks, Oracle and Google Cloud show up
+  constantly as *required skills* in AI postings, and matching those would
+  wrongly tag half the feed as "big tech".
 
 ## Local usage
 
@@ -225,6 +277,14 @@ doesn't grow forever.
 - **Ranked by resume fit:** every alerted job carries a 0-100 score and the
   specific matched skills/reasons, so the highest-fit roles are listed first
   and it's clear *why* each one matched.
+- **Clean dedup across sources:** `src/models.py`'s `canonical_url()` strips
+  tracking params (`utm_*`, `trkEmail`, `refId`, etc.) before hashing, so the
+  same posting reached via two different alert emails or a Google result
+  still dedupes to one entry instead of alerting twice.
+- **Thin-data guard:** a bare title-only hit (e.g. a sparse search snippet)
+  is capped at 72/100 so it can't outrank a fully-described real match —
+  lifted by the priority-employer bonus, since a named Tier-1 company is
+  itself strong evidence even with little text.
 - **Two-tier digest:** WhatsApp gets a short top-10 list (WhatsApp message
   length is constrained); the full-length digest (up to 30) goes to email.
 - **Quiet on empty by default for WhatsApp:** an empty day sends a lightweight
@@ -239,18 +299,27 @@ doesn't grow forever.
 - Bayt scraping is best-effort HTML parsing and frequently gets 403'd from
   cloud/datacenter IPs (including GitHub Actions runners) regardless of
   markup changes — isolated failure, doesn't affect other sources.
-- The Greenhouse/Lever token lists in `config.yaml` include unverified
-  guesses — run `python scripts/check_boards.py` periodically and prune
-  ones that 404.
-- Google Custom Search results for a `watch: true` company are a best-effort
-  signal, not a guarantee: `site:domain` search results can include stale,
-  unrelated, or non-Dubai pages on that domain — the digest flags these
+- New Greenhouse/Lever candidates you add to `config.yaml` yourself are
+  unverified until you run `python scripts/check_boards.py` — do that before
+  (or right after) adding a company, and periodically since companies
+  migrate ATS.
+- Google Custom Search results (both discovery and company-watch) are a
+  best-effort signal, not a guarantee: `site:domain`/broad search results
+  can include stale, unrelated, or non-Dubai pages — the digest flags these
   postings as "targeted search — verify on click-through" rather than
   asserting the location as fact.
-- LinkedIn and Indeed are intentionally not scraped — both aggressively
-  block automated/unauthenticated scraping and doing so against their terms
-  isn't something this system attempts. Add LinkedIn jobs manually by
-  watching your saved searches.
+- LinkedIn and Indeed are **not scraped directly** — both aggressively block
+  automated/unauthenticated scraping. Instead, `src/scrapers/email_alerts.py`
+  reads the board's own daily alert emails over IMAP (see setup step 1),
+  which is legitimate but has its own limits: it only sees what you've
+  saved a search for, the HTML parser is heuristic (company/location
+  extraction can occasionally misfire on an unusual email layout), and if a
+  board changes its alert email template the URL-pattern classifier in
+  `email_alerts.py` may need a small update.
+- Years-of-experience extraction (`_extract_required_years` in
+  `validator.py`) is a regex heuristic over free text ("5+ years", "8-10
+  yrs") — it can miss unusually phrased requirements; treated as a soft
+  score signal for exactly that reason, never a hard exclusion.
 - FX rates are static approximations in `config.yaml`, not live-fetched;
   update them occasionally if you rely heavily on non-AED-denominated
   listings.

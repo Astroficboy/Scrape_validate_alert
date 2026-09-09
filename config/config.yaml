@@ -11,6 +11,10 @@ candidate:
   whatsapp_to: "+918087595673"
   available_from: "2026-10-25"   # "late Oct / early Nov" per candidate
   target_monthly_salary_aed: 45000
+  # Drives the "years required" scoring component below.
+  ai_years: 5        # hands-on AI/ML/GenAI (per CV)
+  total_years: 9      # broader technology/analytics/business experience
+  max_years_tolerated: 12   # postings asking beyond this get penalised, not excluded
 
 search:
   # Free-text queries sent to structured job-search sources (Adzuna etc.)
@@ -141,6 +145,26 @@ salary:
     INR: 0.0442
 
 sources:
+  email_alerts:
+    enabled: true
+    # The most reliable route to LinkedIn/Indeed/Naukrigulf/GulfTalent/Bayt:
+    # instead of scraping (ToS risk, bot detection), create a DAILY email
+    # alert for each target title on each board, scoped to Dubai/UAE, all
+    # delivered to one dedicated inbox — this reads that inbox over IMAP.
+    # No scraping, no account risk. See README for the one-time setup.
+    imap_host: "imap.gmail.com"
+    mailbox: "INBOX"
+    lookback_hours: 26
+    mark_as_read: true
+    # Sender domain -> board display name. Add senders as you set up more alerts.
+    senders:
+      "linkedin.com": "LinkedIn"
+      "indeed.com": "Indeed"
+      "naukrigulf.com": "Naukri Gulf"
+      "gulftalent.com": "GulfTalent"
+      "bayt.com": "Bayt"
+      "monstergulf.com": "Monster Gulf"
+      "glassdoor.com": "Glassdoor"
   adzuna:
     # Disabled: confirmed via a live run that Adzuna's API returns 404 for
     # country code "ae" — the UAE is not one of Adzuna's covered markets, so
@@ -178,13 +202,33 @@ sources:
     # its anti-bot layer more often than not. Treat as opportunistic, not
     # reliable.
     search_url: "https://www.bayt.com/en/uae/jobs/"
+  # Google Custom Search JSON API (https://developer.google.com/custom-search/v1)
+  # — free tier is 100 queries/day, shared here across google_discovery
+  # (broad title search) and google_watch (priority-company search) below.
+  # Discovery spends first; watch gets whatever's left, so adding title
+  # terms degrades gracefully by watching fewer companies rather than
+  # erroring. Needs GOOGLE_API_KEY + GOOGLE_CSE_ID env vars (see
+  # .env.example); both sub-sources are silently disabled without them.
+  google_search:
+    max_daily_queries: 90
+  google_discovery:
+    enabled: true
+    # Broad discovery: (title from search.queries) x (suffix) per query,
+    # so this also catches roles at companies outside priority_targets
+    # entirely — careers pages, ATS boards, Workday postings that never
+    # reach aggregators.
+    date_restrict: "d3"
+    results_per_query: 10
+    suffixes:
+      - "Dubai UAE"
+      - "Dubai jobs site:boards.greenhouse.io OR site:jobs.lever.co"
+      - "UAE site:*.workday.com OR site:*.myworkdayjobs.com"
+      - "site:builtin.com OR site:jobs.techstars.com Dubai"
   google_watch:
     enabled: true
-    # Google Custom Search JSON API (https://developer.google.com/custom-search/v1)
-    # — free tier is 100 queries/day. Each `watch: true` company in
-    # priority_targets below costs exactly one query per run. Needs
-    # GOOGLE_API_KEY + GOOGLE_CSE_ID env vars (see .env.example); silently
-    # disabled without them.
+    # Each `watch: true` company in priority_targets below costs exactly one
+    # query per run (fallback budget if google_discovery is disabled/fails
+    # to report spend — normally main.py computes the real remainder).
     daily_query_budget: 35
     results_per_query: 10
 

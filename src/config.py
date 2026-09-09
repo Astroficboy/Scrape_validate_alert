@@ -51,6 +51,12 @@ class Secrets:
         self.google_api_key = _env("GOOGLE_API_KEY")
         self.google_cse_id = _env("GOOGLE_CSE_ID")
 
+        # IMAP reads the same dedicated inbox the digest is sent from by
+        # default (the README recommends one fresh Gmail for both), but can
+        # be pointed elsewhere via IMAP_USER/IMAP_PASSWORD if needed.
+        self.imap_user = _env("IMAP_USER") or self.email_address
+        self.imap_password = _env("IMAP_PASSWORD") or self.email_app_password
+
     @property
     def twilio_whatsapp_to(self) -> str:
         number = self.twilio_whatsapp_to_raw

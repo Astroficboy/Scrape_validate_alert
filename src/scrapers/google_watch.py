@@ -21,10 +21,9 @@ import requests
 
 from src.models import JobPosting
 from src.scrapers.base import BaseScraper, DEFAULT_HEADERS
+from src.scrapers.google_cse_common import ENDPOINT, is_noise_link
 
 logger = logging.getLogger(__name__)
-
-API_URL = "https://www.googleapis.com/customsearch/v1"
 
 ROLE_TERMS = '(Lead OR Senior OR Principal OR Staff OR Architect OR "Head of" OR Director)'
 DOMAIN_TERMS = '(AI OR "machine learning" OR "artificial intelligence" OR GenAI OR LLM)'
@@ -34,28 +33,33 @@ LOCATION_TERMS = '(Dubai OR UAE OR "United Arab Emirates" OR "Abu Dhabi")'
 class GoogleWatchScraper(BaseScraper):
     name = "google_watch"
 
-    def __init__(self, config: dict, api_key: str, cse_id: str):
+    def __init__(self, config: dict, api_key: str, cse_id: str, query_budget: int | None = None):
         super().__init__(config)
         self.api_key = api_key
         self.cse_id = cse_id
         self.src_cfg = config["sources"]["google_watch"]
+        # None means "use sources.google_watch.daily_query_budget as-is";
+        # main.py passes an explicit override once it knows how much of the
+        # shared sources.google_search.max_daily_queries budget discovery
+        # queries left behind.
+        self.query_budget = query_budget
 
     def _watched_companies(self) -> list[tuple[str, str, str]]:
         """Returns (name, domain, tier_key) for every watch:true company,
-        truncated to the configured daily query budget."""
+        truncated to the effective daily query budget."""
         companies: list[tuple[str, str, str]] = []
         for tier_key, tier in self.config.get("priority_targets", {}).items():
             for company in tier.get("companies", []):
                 if company.get("watch"):
                     companies.append((company.get("name", ""), company.get("domain", ""), tier_key))
 
-        budget = self.src_cfg.get("daily_query_budget", 35)
+        budget = self.query_budget if self.query_budget is not None else self.src_cfg.get("daily_query_budget", 35)
         if len(companies) > budget:
             logger.warning(
-                "[google_watch] %d watched companies exceeds daily_query_budget=%d — "
+                "[google_watch] %d watched companies exceeds budget=%d — "
                 "only searching the first %d", len(companies), budget, budget
             )
-        return companies[:budget]
+        return companies[: max(0, budget)]
 
     def is_enabled(self) -> bool:
         return (
@@ -80,7 +84,7 @@ class GoogleWatchScraper(BaseScraper):
                 "num": min(results_per_query, 10),
             }
             try:
-                resp = requests.get(API_URL, params=params, headers=DEFAULT_HEADERS, timeout=20)
+                resp = requests.get(ENDPOINT, params=params, headers=DEFAULT_HEADERS, timeout=20)
                 resp.raise_for_status()
                 data = resp.json()
             except Exception:
@@ -89,6 +93,8 @@ class GoogleWatchScraper(BaseScraper):
                 continue
 
             for item in data.get("items", []):
+                if is_noise_link(item.get("link", "")):
+                    continue
                 jobs.append(
                     JobPosting(
                         source="google_watch",
