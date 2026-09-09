@@ -7,7 +7,7 @@
 candidate:
   name: "Pranav Wankhedkar"
   # Used only as a fallback if EMAIL_TO / TWILIO_WHATSAPP_TO env vars are unset.
-  email_to: "pranav.wanya@gmail.com"
+  email_to: "pranavwankhedkar@gmail.com"
   whatsapp_to: "+918087595673"
   available_from: "2026-10-25"   # "late Oct / early Nov" per candidate
   target_monthly_salary_aed: 45000

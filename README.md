@@ -84,7 +84,7 @@ Register at https://developer.adzuna.com/ for an `app_id` and `app_key`.
 2. Create an App Password: https://myaccount.google.com/apppasswords
 3. Use that Gmail address as `EMAIL_ADDRESS` and the 16-character app
    password as `EMAIL_APP_PASSWORD`. `EMAIL_TO` is where the digest goes
-   (defaults to `pranav.wanya@gmail.com` from `config.yaml` if unset).
+   (defaults to `pranavwankhedkar@gmail.com` from `config.yaml` if unset).
 
 ### 3. WhatsApp (Twilio)
 
@@ -114,7 +114,7 @@ ADZUNA_APP_ID
 ADZUNA_APP_KEY
 EMAIL_ADDRESS
 EMAIL_APP_PASSWORD
-EMAIL_TO                 (optional — defaults to pranav.wanya@gmail.com)
+EMAIL_TO                 (optional — defaults to pranavwankhedkar@gmail.com)
 TWILIO_ACCOUNT_SID
 TWILIO_AUTH_TOKEN
 TWILIO_WHATSAPP_FROM
