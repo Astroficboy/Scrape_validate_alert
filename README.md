@@ -127,7 +127,7 @@ for an `app_id`/`app_key` and flip `sources.adzuna.enabled` to `true` in
 2. Get `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` from the console.
 3. **Testing (fastest):** use the Twilio Sandbox for WhatsApp
    (`TWILIO_WHATSAPP_FROM=whatsapp:+14155238886`) and have the receiving
-   number (`+918087595673`) send the sandbox's join code once via WhatsApp.
+   number (``) send the sandbox's join code once via WhatsApp.
    Freeform messages then work for 24h sessions/testing.
 4. **Production (required for unattended daily sends):** WhatsApp requires a
    pre-approved message template for business-initiated messages outside a
@@ -149,11 +149,11 @@ GOOGLE_API_KEY
 GOOGLE_CSE_ID
 EMAIL_ADDRESS
 EMAIL_APP_PASSWORD
-EMAIL_TO                 (optional — defaults to pranavwankhedkar@gmail.com)
+EMAIL_TO                 (optional — defaults to)
 TWILIO_ACCOUNT_SID
 TWILIO_AUTH_TOKEN
 TWILIO_WHATSAPP_FROM
-TWILIO_WHATSAPP_TO        (optional — defaults to +918087595673)
+TWILIO_WHATSAPP_TO        (optional — defaults to +)
 TWILIO_CONTENT_SID        (optional — required only for production WhatsApp sends)
 ADZUNA_APP_ID              (optional — Adzuna is disabled by default, see above)
 ADZUNA_APP_KEY              (optional)
