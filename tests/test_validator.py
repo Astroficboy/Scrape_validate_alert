@@ -68,6 +68,27 @@ def test_annual_salary_is_detected_and_converted(config):
     assert "50,000" in result[0].salary_note or "49," in result[0].salary_note
 
 
+def test_priority_target_boosts_score_over_unknown_company(config):
+    tier1 = _job(url="https://example.com/job/g42", company="G42", description="AI role at G42, Abu Dhabi.")
+    unknown = _job(url="https://example.com/job/unknown", company="Some Random Startup")
+    result = validate_and_score([unknown, tier1], config)
+    scores = {j.url: j.score for j in result}
+    assert scores["https://example.com/job/g42"] > scores["https://example.com/job/unknown"]
+    tier1_job = next(j for j in result if j.company == "G42")
+    assert any("Priority target" in r for r in tier1_job.reasons)
+
+
+def test_deprioritised_company_scores_lower_than_unknown(config):
+    services_firm = _job(url="https://example.com/job/wipro", company="Wipro")
+    unknown = _job(url="https://example.com/job/unknown2", company="Some Random Startup")
+    result = validate_and_score([services_firm, unknown], config)
+    scores = {j.url: j.score for j in result}
+    # Wipro may or may not clear min_score_to_alert once the -25 tier penalty
+    # applies; if it's still present, it must rank below the unknown company.
+    if "https://example.com/job/wipro" in scores:
+        assert scores["https://example.com/job/wipro"] < scores["https://example.com/job/unknown2"]
+
+
 def test_results_sorted_by_score_descending(config):
     strong = _job(
         url="https://example.com/job/strong",

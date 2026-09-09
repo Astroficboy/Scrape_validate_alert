@@ -23,23 +23,33 @@ def load_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
     return cfg
 
 
+def _env(name: str, default: str = "") -> str:
+    """os.getenv + strip(). GitHub Actions secrets pasted with a trailing
+    newline (easy to do via copy-paste) otherwise silently corrupt request
+    URLs/headers — seen in practice with a leading %0A in an Adzuna key."""
+    return os.getenv(name, default).strip()
+
+
 class Secrets:
     """Thin wrapper around env vars so callers can check `.available` instead
     of scattering `os.getenv` + None-checks across the codebase."""
 
     def __init__(self, cfg: dict[str, Any]):
-        self.adzuna_app_id = os.getenv("ADZUNA_APP_ID", "")
-        self.adzuna_app_key = os.getenv("ADZUNA_APP_KEY", "")
+        self.adzuna_app_id = _env("ADZUNA_APP_ID")
+        self.adzuna_app_key = _env("ADZUNA_APP_KEY")
 
-        self.email_address = os.getenv("EMAIL_ADDRESS", "")
-        self.email_app_password = os.getenv("EMAIL_APP_PASSWORD", "")
-        self.email_to = os.getenv("EMAIL_TO") or cfg["candidate"]["email_to"]
+        self.email_address = _env("EMAIL_ADDRESS")
+        self.email_app_password = _env("EMAIL_APP_PASSWORD")
+        self.email_to = _env("EMAIL_TO") or cfg["candidate"]["email_to"]
 
-        self.twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
-        self.twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
-        self.twilio_whatsapp_from = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
-        self.twilio_whatsapp_to_raw = os.getenv("TWILIO_WHATSAPP_TO") or cfg["candidate"]["whatsapp_to"]
-        self.twilio_content_sid = os.getenv("TWILIO_CONTENT_SID", "")
+        self.twilio_account_sid = _env("TWILIO_ACCOUNT_SID")
+        self.twilio_auth_token = _env("TWILIO_AUTH_TOKEN")
+        self.twilio_whatsapp_from = _env("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+        self.twilio_whatsapp_to_raw = _env("TWILIO_WHATSAPP_TO") or cfg["candidate"]["whatsapp_to"]
+        self.twilio_content_sid = _env("TWILIO_CONTENT_SID")
+
+        self.google_api_key = _env("GOOGLE_API_KEY")
+        self.google_cse_id = _env("GOOGLE_CSE_ID")
 
     @property
     def twilio_whatsapp_to(self) -> str:

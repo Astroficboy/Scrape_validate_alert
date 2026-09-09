@@ -142,24 +142,55 @@ salary:
 
 sources:
   adzuna:
-    enabled: true
+    # Disabled: confirmed via a live run that Adzuna's API returns 404 for
+    # country code "ae" — the UAE is not one of Adzuna's covered markets, so
+    # this source can never return Dubai/UAE results regardless of
+    # credentials. Left wired up in code in case Adzuna adds MENA coverage.
+    enabled: false
     country: "ae"
     results_per_query: 25
   greenhouse:
     enabled: true
-    # Add "board_token" values from careers.<company>.com pages that run on
-    # Greenhouse (URL pattern: boards.greenhouse.io/<token>). Empty by
-    # default — populate with companies you're targeting.
-    companies: []
+    # boards-api.greenhouse.io/v1/boards/<token>/jobs — token comes from the
+    # company's careers page URL (boards.greenhouse.io/<token>). "datacamp"
+    # confirmed live (Sept 2026); the rest are unverified guesses — run
+    # scripts/check_boards.py to prune ones that don't resolve.
+    companies:
+      - datacamp
+      - careem
+      - tabby
+      - kitopi
+      - propertyfinder
+      - talabat
+      - binance
+      - bybit
   lever:
     enabled: true
-    # Add company slugs from jobs.lever.co/<slug>. Empty by default.
-    companies: []
+    # api.lever.co/v0/postings/<slug> — slug comes from jobs.lever.co/<slug>.
+    # Unverified guesses — run scripts/check_boards.py to prune.
+    companies:
+      - tabby
+      - alefeducation
+      - huspy
+      - sarwa
+      - ziina
+      - nybl
   bayt:
     enabled: true
-    # Best-effort HTML scraper — Bayt's markup can change without notice.
-    # If it starts returning zero results, check src/scrapers/bayt.py first.
+    # Best-effort HTML scraper — Bayt's markup can change without notice,
+    # AND cloud/datacenter IPs (like GitHub Actions runners) get 403'd by
+    # its anti-bot layer more often than not. Treat as opportunistic, not
+    # reliable.
     search_url: "https://www.bayt.com/en/uae/jobs/"
+  google_watch:
+    enabled: true
+    # Google Custom Search JSON API (https://developer.google.com/custom-search/v1)
+    # — free tier is 100 queries/day. Each `watch: true` company in
+    # priority_targets below costs exactly one query per run. Needs
+    # GOOGLE_API_KEY + GOOGLE_CSE_ID env vars (see .env.example); silently
+    # disabled without them.
+    daily_query_budget: 35
+    results_per_query: 10
 
 digest:
   max_jobs_whatsapp: 10
@@ -167,3 +198,108 @@ digest:
   notify_email_on_empty: true
   notify_whatsapp_on_empty: false
   notify_on_source_failure: true
+
+# ---------------------------------------------------------------------------
+# PRIORITY TARGETS — drives both the Google-watch search queries (sources.
+# google_watch above) and score bonuses in the validator.
+#
+# Each tier's `bonus` is added to a job's match score, so an equivalent role
+# at Emirates NBD outranks one at an unknown integrator. Companies match by
+# `name` appearing in the job title/company/description, and by `domain`
+# appearing in the job URL. `watch: true` spends one Google query per run on
+# that company — keep watched companies under the daily_query_budget above.
+# ---------------------------------------------------------------------------
+priority_targets:
+
+  # ---------------------------------------------------------------- TIER 1
+  # Pay 45k+. Dubai-based, enterprise AI, agentic workflows on the roadmap.
+  banks:
+    bonus: 14
+    note: "Highest average GenAI pay of any UAE sector (~AED 53k/month)"
+    companies:
+      - {name: "Emirates NBD",              domain: "emiratesnbd.com",    watch: true}
+      - {name: "First Abu Dhabi Bank",      domain: "bankfab.com",        watch: true}
+      - {name: "FAB",                       domain: "bankfab.com",        watch: false}
+      - {name: "Mashreq",                   domain: "mashreqbank.com",    watch: true}
+      - {name: "ADCB",                      domain: "adcb.com",           watch: true}
+      - {name: "Abu Dhabi Commercial Bank", domain: "adcb.com",           watch: false}
+      - {name: "Dubai Islamic Bank",        domain: "dib.ae",             watch: false}
+      - {name: "Emirates Islamic",          domain: "emiratesislamic.ae", watch: false}
+
+  # Sovereign AI cluster. Pays 15-30% above market. ABU DHABI — commute matters.
+  sovereign_ai:
+    bonus: 13
+    note: "G42 median SWE total comp AED 434K, tops out near AED 700K"
+    companies:
+      - {name: "G42",       domain: "g42.ai",       watch: true}
+      - {name: "Core42",    domain: "core42.ai",    watch: true}
+      - {name: "Presight",  domain: "presight.ai",  watch: true}
+      - {name: "Inception", domain: "",             watch: false}
+      - {name: "Bayanat",   domain: "bayanat.ai",   watch: false}
+      - {name: "AIQ",       domain: "aiq.ae",       watch: false}
+      - {name: "M42",       domain: "m42.ae",       watch: false}
+      - {name: "Technology Innovation Institute", domain: "tii.ae", watch: false}
+      - {name: "Mubadala",  domain: "mubadala.com", watch: false}
+      - {name: "ADNOC",     domain: "adnoc.ae",     watch: true}
+
+  # Big tech regional. RSUs push senior total comp to AED 450k-750k.
+  big_tech:
+    bonus: 13
+    note: "Google Cloud MEA is the closest match to your GCP/Gemini stack"
+    companies:
+      - {name: "Google",              domain: "google.com",     watch: true}
+      - {name: "Microsoft",           domain: "microsoft.com",  watch: true}
+      - {name: "Amazon Web Services", domain: "amazon.jobs",    watch: true}
+      - {name: "AWS",                 domain: "amazon.jobs",    watch: false}
+      - {name: "NVIDIA",              domain: "nvidia.com",     watch: false}
+      - {name: "Oracle",              domain: "oracle.com",     watch: false}
+      - {name: "Databricks",          domain: "databricks.com", watch: false}
+      - {name: "Snowflake",           domain: "snowflake.com",  watch: false}
+      - {name: "IBM",                 domain: "ibm.com",        watch: false}
+      - {name: "SAP",                 domain: "sap.com",        watch: false}
+
+  # ---------------------------------------------------------------- TIER 2
+  product_tech:
+    bonus: 7
+    note: "Strong engineering cultures; 45k needs a genuinely senior scope"
+    companies:
+      - {name: "Careem",          domain: "careem.com",        watch: true}
+      - {name: "noon",            domain: "noon.com",          watch: true}
+      - {name: "Talabat",         domain: "talabat.com",       watch: true}
+      - {name: "Property Finder", domain: "propertyfinder.ae", watch: false}
+      - {name: "Dubizzle",        domain: "dubizzle.com",      watch: false}
+      - {name: "Bayut",           domain: "bayut.com",         watch: false}
+      - {name: "Tabby",           domain: "tabby.ai",          watch: false}
+      - {name: "Kitopi",          domain: "kitopi.com",        watch: false}
+      - {name: "DP World",        domain: "dpworld.com",       watch: true}
+      - {name: "Aramex",          domain: "aramex.com",        watch: false}
+      - {name: "Emirates Group",  domain: "emiratesgroupcareers.com", watch: true}
+      - {name: "Etihad",          domain: "etihad.com",        watch: false}
+      - {name: "e&",              domain: "eand.com",          watch: false}
+      - {name: "Etisalat",        domain: "etisalat.ae",       watch: false}
+
+  crypto:
+    bonus: 4
+    note: "Pays well, sector volatility — weigh that yourself"
+    companies:
+      - {name: "Binance",    domain: "binance.com",  watch: false}
+      - {name: "Bybit",      domain: "bybit.com",    watch: false}
+      - {name: "OKX",        domain: "okx.com",      watch: false}
+      - {name: "Crypto.com", domain: "crypto.com",   watch: false}
+
+  # ---------------------------------------------------------------- TIER 3
+  # Negative bonus — still surfaced, but pushed down. These rarely clear 45k,
+  # and Indian IT services in the UAE tend to benchmark off India comp.
+  deprioritised:
+    bonus: -25
+    note: "Services firms and deputation packages below your target"
+    companies:
+      - {name: "Wipro",             domain: "wipro.com",        watch: false}
+      - {name: "Tata Consultancy",  domain: "tcs.com",          watch: false}
+      - {name: "TCS",               domain: "tcs.com",          watch: false}
+      - {name: "Infosys",           domain: "infosys.com",      watch: false}
+      - {name: "HCLTech",           domain: "hcltech.com",      watch: false}
+      - {name: "Tech Mahindra",     domain: "techmahindra.com", watch: false}
+      - {name: "Cognizant",         domain: "cognizant.com",    watch: false}
+      - {name: "LTIMindtree",       domain: "ltimindtree.com",  watch: false}
+      - {name: "Capgemini",         domain: "capgemini.com",    watch: false}

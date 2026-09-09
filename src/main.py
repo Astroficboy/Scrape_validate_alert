@@ -24,6 +24,7 @@ from src.notifiers.email_notifier import send_email
 from src.notifiers.whatsapp_notifier import send_whatsapp
 from src.scrapers.adzuna import AdzunaScraper
 from src.scrapers.bayt import BaytScraper
+from src.scrapers.google_watch import GoogleWatchScraper
 from src.scrapers.greenhouse import GreenhouseScraper
 from src.scrapers.lever import LeverScraper
 from src.store import SeenJobsStore
@@ -42,6 +43,7 @@ def run() -> int:
         GreenhouseScraper(config),
         LeverScraper(config),
         BaytScraper(config),
+        GoogleWatchScraper(config, secrets.google_api_key, secrets.google_cse_id),
     ]
 
     all_jobs: list[JobPosting] = []

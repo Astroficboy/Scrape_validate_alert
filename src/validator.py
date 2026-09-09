@@ -42,6 +42,38 @@ def _score_skills(text: str, skill_weights: dict[str, int]) -> tuple[float, list
     return normalized, hit_skills
 
 
+def build_priority_index(priority_targets: dict) -> list[tuple[str, str, float, str]]:
+    """Flattens config.yaml's priority_targets tiers into (name, domain,
+    bonus, tier_key) tuples for fast lookup per job."""
+    index: list[tuple[str, str, float, str]] = []
+    for tier_key, tier in (priority_targets or {}).items():
+        bonus = tier.get("bonus", 0)
+        for company in tier.get("companies", []):
+            name = (company.get("name") or "").strip().lower()
+            domain = (company.get("domain") or "").strip().lower()
+            if name or domain:
+                index.append((name, domain, bonus, tier_key))
+    return index
+
+
+def _priority_bonus(job: JobPosting, index: list[tuple[str, str, float, str]]) -> tuple[float, str | None, str | None]:
+    """Returns (bonus, tier_key, matched_name) for the strongest match, or
+    (0, None, None) if the job doesn't match any priority target."""
+    blob = f"{job.title} {job.company} {job.description}".lower()
+    url = (job.url or "").lower()
+
+    best_bonus = 0.0
+    best_tier: str | None = None
+    best_name: str | None = None
+    for name, domain, bonus, tier_key in index:
+        matched = (name and name in blob) or (domain and domain in url)
+        if matched and (best_tier is None or bonus > best_bonus):
+            best_bonus = bonus
+            best_tier = tier_key
+            best_name = name or domain
+    return best_bonus, best_tier, best_name
+
+
 def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]:
     """Returns only the jobs that pass hard filters, each with `.score`,
     `.reasons`, and `.salary_note` populated, sorted best-first."""
@@ -62,6 +94,8 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
     fx_table = salary_cfg["fx_to_aed"]
     target_monthly = salary_cfg["min_monthly"]
     tolerance_ratio = salary_cfg["tolerance_ratio"]
+
+    priority_index = build_priority_index(config.get("priority_targets", {}))
 
     passed: list[JobPosting] = []
 
@@ -117,13 +151,21 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
                 salary_note = f"~{monthly_aed:,.0f} AED/month disclosed"
                 reasons.append(salary_note)
 
+        # Priority-target bonus: ranks known high-paying/target employers
+        # (config.yaml priority_targets) above equivalent roles at unknown
+        # companies. Can also be negative (e.g. IT services firms that
+        # typically undershoot the salary target) to push those down.
+        priority_bonus, priority_tier, priority_name = _priority_bonus(job, priority_index)
+        if priority_tier:
+            reasons.append(f"Priority target ({priority_tier}: {priority_name}, {priority_bonus:+.0f})")
+
         # Base score reflects that the job already cleared every hard gate
         # (senior title, AI/engineering domain, Dubai/UAE location, no
-        # disclosed salary below target). Skill overlap and salary refine the
-        # ranking on top of that instead of being able to sink a genuine
-        # match just because a short job blurb didn't literally repeat resume
-        # keywords.
-        score = min(100.0, 35 + skill_score * 0.35 + location_bonus + salary_bonus)
+        # disclosed salary below target). Skill overlap, salary and the
+        # priority-target bonus refine the ranking on top of that instead of
+        # being able to sink a genuine match just because a short job blurb
+        # didn't literally repeat resume keywords.
+        score = min(100.0, max(0.0, 35 + skill_score * 0.35 + location_bonus + salary_bonus + priority_bonus))
 
         if score < min_score:
             continue
