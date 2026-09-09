@@ -152,29 +152,25 @@ sources:
   greenhouse:
     enabled: true
     # boards-api.greenhouse.io/v1/boards/<token>/jobs — token comes from the
-    # company's careers page URL (boards.greenhouse.io/<token>). "datacamp"
-    # confirmed live (Sept 2026); the rest are unverified guesses — run
-    # scripts/check_boards.py to prune ones that don't resolve.
+    # company's careers page URL (boards.greenhouse.io/<token>). Verified
+    # live via scripts/check_boards.py (Sept 2026): datacamp (33 jobs, 8
+    # UAE), careem (20 jobs, 12 UAE), bybit (152 jobs, 61 UAE). Pruned:
+    # tabby, kitopi, propertyfinder, talabat, binance (all 404 — wrong
+    # token or not on Greenhouse; re-run check_boards.py periodically since
+    # companies migrate ATS).
     companies:
       - datacamp
       - careem
-      - tabby
-      - kitopi
-      - propertyfinder
-      - talabat
-      - binance
       - bybit
   lever:
     enabled: true
     # api.lever.co/v0/postings/<slug> — slug comes from jobs.lever.co/<slug>.
-    # Unverified guesses — run scripts/check_boards.py to prune.
-    companies:
-      - tabby
-      - alefeducation
-      - huspy
-      - sarwa
-      - ziina
-      - nybl
+    # Verified via scripts/check_boards.py (Sept 2026): every guessed slug
+    # (tabby, alefeducation, huspy, sarwa, ziina, nybl) 404'd — none of these
+    # companies are on Lever under those slugs. Left empty; add real slugs
+    # here once found (check a company's careers page for a jobs.lever.co
+    # redirect, or re-run check_boards.py after adding candidates).
+    companies: []
   bayt:
     enabled: true
     # Best-effort HTML scraper — Bayt's markup can change without notice,

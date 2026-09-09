@@ -70,10 +70,11 @@ comes from:
 
 - **Greenhouse** / **Lever** — most tech companies' own ATS expose a public,
   unauthenticated JSON jobs API (`boards-api.greenhouse.io`, `api.lever.co`).
-  `config.yaml` ships with a starter list of guessed tokens for UAE-relevant
-  companies (`datacamp` confirmed live) — run `python scripts/check_boards.py`
-  (or the `check-boards.yml` workflow, `workflow_dispatch`) to see which
-  actually resolve and prune the rest.
+  `config.yaml`'s Greenhouse list is verified live (via `scripts/check_boards.py`,
+  run through `check-boards.yml`): `datacamp` (33 jobs, 8 UAE), `careem` (20
+  jobs, 12 UAE), `bybit` (152 jobs, 61 UAE) — the other guessed tokens (and
+  every guessed Lever slug) 404'd and were pruned. Re-run
+  `python scripts/check_boards.py` after adding new candidate companies.
 - **Google Custom Search** (`src/scrapers/google_watch.py`) — most Tier-1
   targets (banks, the G42/sovereign-AI cluster, big tech regional offices)
   run their own careers portal (Workday, in-house), not a scrapable public
