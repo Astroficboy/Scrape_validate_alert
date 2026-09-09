@@ -28,6 +28,22 @@ def test_junior_role_is_excluded(config):
     assert result == []
 
 
+def test_international_is_not_wrongly_excluded_as_intern(config):
+    # Regression: exclude_keywords contains "intern", which as a naive
+    # substring match would also fire inside "international" and wrongly
+    # kill a genuine posting for mentioning "international team".
+    jobs = [_job(description="Join our international team building agentic AI on GCP.")]
+    result = validate_and_score(jobs, config)
+    assert len(result) == 1
+
+
+def test_actual_internship_is_still_excluded(config):
+    # Seniority/domain signals are otherwise fine — isolates the exclude check.
+    jobs = [_job(title="Lead AI Engineer", description="Also oversees our AI internship program.")]
+    result = validate_and_score(jobs, config)
+    assert result == []
+
+
 def test_non_senior_title_is_excluded(config):
     jobs = [_job(title="AI Engineer")]  # no seniority keyword
     result = validate_and_score(jobs, config)

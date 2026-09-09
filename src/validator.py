@@ -21,6 +21,14 @@ def _contains_any(text: str, needles: list[str]) -> bool:
     return any(needle.lower() in text for needle in needles)
 
 
+def _contains_word(text: str, needles: list[str]) -> bool:
+    """Like _contains_any, but word-bounded — a plain substring match would
+    let "intern" fire inside "international", wrongly hard-excluding a
+    genuine posting just for mentioning "international team"."""
+    text_l = text.lower()
+    return any(re.search(rf"(?<!\w){re.escape(n.lower())}(?!\w)", text_l) for n in needles)
+
+
 def _normalize_salary_to_aed(amount: float, currency: str | None, fx_table: dict) -> float | None:
     currency = (currency or "AED").upper()
     rate = fx_table.get(currency)
@@ -172,8 +180,9 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
             rejected["location not Dubai/UAE"] += 1
             continue
 
-        # Exclude explicit junior/intern postings outright.
-        if _contains_any(blob, exclude_kw):
+        # Exclude explicit junior/intern postings outright. Word-bounded so
+        # "intern" doesn't fire inside "international", etc.
+        if _contains_word(blob, exclude_kw):
             rejected["excluded keyword (junior/intern/etc)"] += 1
             continue
 
