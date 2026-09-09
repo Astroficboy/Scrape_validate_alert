@@ -6,10 +6,14 @@ keyword lists and weights this module reads.
 
 from __future__ import annotations
 
+import logging
 import re
+from collections import Counter
 from dataclasses import dataclass
 
 from src.models import JobPosting
+
+logger = logging.getLogger(__name__)
 
 
 def _contains_any(text: str, needles: list[str]) -> bool:
@@ -150,30 +154,39 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
     priority_index = build_priority_index(config.get("priority_targets", {}))
 
     passed: list[JobPosting] = []
+    # Funnel telemetry: without this, an empty digest on a day with plenty of
+    # raw postings is undiagnosable from the outside — was the location gate
+    # too strict, or genuinely nothing senior/AI-relevant came in today?
+    rejected: Counter[str] = Counter()
 
     for job in jobs:
         title = job.title or ""
         blob = f"{job.title} {job.description}"
 
         if not title:
+            rejected["missing title"] += 1
             continue
 
         # Location gate: must be Dubai/UAE per config.
         if not _matches_location(job.location or "", locations):
+            rejected["location not Dubai/UAE"] += 1
             continue
 
         # Exclude explicit junior/intern postings outright.
         if _contains_any(blob, exclude_kw):
+            rejected["excluded keyword (junior/intern/etc)"] += 1
             continue
 
         # Must look senior.
         is_senior = _contains_any(title, seniority_kw)
         if not is_senior:
+            rejected["no seniority keyword in title"] += 1
             continue
 
         # Must be AI/ML/engineering domain.
         is_domain = _contains_any(blob, domain_kw)
         if not is_domain:
+            rejected["not AI/engineering domain"] += 1
             continue
 
         reasons = ["Senior-level title", "AI/engineering domain match"]
@@ -198,7 +211,8 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
                 # over 3x the monthly target as annual and convert down.
                 monthly_aed = aed_value / 12 if aed_value > target_monthly * 3 else aed_value
                 if monthly_aed < target_monthly * tolerance_ratio:
-                    continue  # disclosed salary clearly below target -> exclude
+                    rejected["disclosed salary below target"] += 1
+                    continue
                 salary_bonus = 20 if monthly_aed >= target_monthly else 10
                 salary_note = f"~{monthly_aed:,.0f} AED/month disclosed"
                 reasons.append(salary_note)
@@ -250,6 +264,7 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
         score = min(100.0, max(0.0, score))
 
         if score < min_score:
+            rejected[f"score below min_score_to_alert ({min_score})"] += 1
             continue
 
         job.score = score
@@ -258,4 +273,12 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
         passed.append(job)
 
     passed.sort(key=lambda j: j.score, reverse=True)
+
+    if jobs:
+        funnel = ", ".join(f"{count} {reason}" for reason, count in rejected.most_common())
+        logger.info(
+            "Filter funnel: %d raw -> %d passed (%s)",
+            len(jobs), len(passed), funnel or "no rejections",
+        )
+
     return passed
