@@ -1,12 +1,18 @@
 name: Verify Greenhouse/Lever Board Tokens
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "configured = re-verify config.yaml tokens; candidates = probe scripts/candidate_boards.txt for new boards"
+        type: choice
+        options: [configured, candidates]
+        default: configured
 
 jobs:
   check-boards:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,4 +27,9 @@ jobs:
         run: pip install requests PyYAML python-dotenv
 
       - name: Check board tokens
-        run: python scripts/check_boards.py
+        run: |
+          if [ "${{ inputs.mode }}" = "candidates" ]; then
+            python scripts/check_boards.py --candidates scripts/candidate_boards.txt
+          else
+            python scripts/check_boards.py
+          fi
