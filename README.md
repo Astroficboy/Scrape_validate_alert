@@ -226,10 +226,16 @@ query. Read the `FIX:` line in the Actions log:
 - `reason=keyInvalid` -> `GOOGLE_API_KEY` is wrong (check it starts with `AIza`).
 - `reason=badRequest` / `invalid` -> `GOOGLE_CSE_ID` is wrong (see above).
 - `reason=forbidden` / `accessNotConfigured` ("this project does not have
-  access to Custom Search JSON API") -> the key is valid but the API is not
-  switched on. Creating an API key does not enable any API by itself: go to
-  Cloud Console -> **APIs & Services -> Library**, search **Custom Search
-  API**, and press **Enable** on the *same project* the key belongs to.
+  access to Custom Search JSON API") -> the key is recognised, but Custom
+  Search API is not enabled for **the project that key belongs to**. That is
+  not necessarily the project open in your console tab. If the console shows
+  the API enabled and calls still 403, then either the key was created under
+  a different project, or it carries an **API restriction** (Credentials ->
+  the key -> *API restrictions*) whose allowed list excludes Custom Search
+  API. Fastest way out is to create a fresh key inside the project that has
+  the API enabled, with Application restrictions **None** and API
+  restrictions **Don't restrict key**, and verify it in a browser before
+  storing it.
 - `reason=ipRefererBlocked` -> the key has an Application restriction that
   blocks the Actions runner; set Application restrictions to **None**.
 - `reason=dailyLimitExceeded` -> the 100/day quota is spent; lower
@@ -239,12 +245,21 @@ The pipeline also pre-checks the *shape* of both secrets before spending any
 quota, so an obviously swapped or pasted-URL value is reported without
 burning a query.
 
-To verify a pair by hand, open this in a browser (substitute your own values)
-— the JSON reply names the exact problem:
+**Always verify a key in a browser before storing it as a secret.** Once it
+is in GitHub it is masked as `***` and cannot be read back, so a wrong value
+can only be diagnosed indirectly. Open this, substituting your own values:
 
 ```
 https://www.googleapis.com/customsearch/v1?key=YOUR_API_KEY&cx=YOUR_CSE_ID&q=test
 ```
+
+- JSON containing `"items"` -> the pair works; store exactly these values.
+- A 403/400 error -> fix it here first. Storing it will only reproduce the
+  same error inside the workflow, where it is much harder to see.
+
+This also distinguishes the two failure classes cleanly: if the browser
+works but the workflow does not, the problem is the stored secret (stale or
+mistyped); if the browser fails too, the problem is the key or its project.
 
 ### 2b. Adzuna API (optional — currently disabled)
 

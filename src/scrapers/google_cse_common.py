@@ -68,10 +68,16 @@ _REMEDIES = {
         "key. Enable 'Custom Search API' in Google Cloud Console -> APIs & Services."
     ),
     "forbidden": (
-        "Almost always 'this project does not have access to Custom Search "
-        "JSON API' — creating an API key does not enable any API. Go to Google "
-        "Cloud Console -> APIs & Services -> Library, search 'Custom Search "
-        "API', and press Enable on the SAME project the key belongs to."
+        "'This project does not have the access to Custom Search JSON API' "
+        "means the API is not enabled for the project THIS KEY belongs to. "
+        "Note the error names the key's project, which is not necessarily the "
+        "project open in your console tab — if the console shows the API "
+        "enabled and calls still 403, the key was created under a different "
+        "project (or is restricted, under Credentials -> the key -> API "
+        "restrictions, to a set that excludes Custom Search API). Verify a "
+        "key in a browser BEFORE storing it: "
+        "https://www.googleapis.com/customsearch/v1?key=KEY&cx=CX&q=test "
+        "should return JSON containing 'items'."
     ),
     "ipreferrerblocked": (
         "The API key has an Application restriction (HTTP referrer / IP) that "
@@ -102,13 +108,14 @@ _REMEDIES = {
 def _error_metadata(err: dict) -> dict:
     """Pulls Google's google.rpc.ErrorInfo metadata out of an error body.
 
-    This is the part that actually resolves a "but I DID enable it" standoff:
-    `consumer` names the project the API key resolves to (as a project
-    number), and `activationUrl` is a link that enables the API on *that*
-    project. When the console shows the API enabled but calls still 403, the
-    key belongs to a different project than the one being looked at, and this
-    is what proves it. Project numbers are identifiers, not credentials — the
-    key and cx are still never logged.
+    When present, `consumer` names the project an API key resolves to and
+    `activationUrl` links to enabling the API on that project — which would
+    settle a "but I DID enable it" standoff outright. Measured against the
+    live endpoint (Sept 2026), Custom Search still replies in the older
+    error format with no `details` array, so this returns {} there; it is
+    kept for the errors that do carry it and costs nothing when absent.
+    Project numbers are identifiers, not credentials — the key and cx are
+    still never logged.
     """
     for detail in err.get("details") or []:
         if not isinstance(detail, dict):
