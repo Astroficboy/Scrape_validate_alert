@@ -1,11 +1,13 @@
 """Reconnaissance for the Dubai Careers (Oracle Taleo) careers site.
 
-Taleo career sections render through FreeMarker (.ftl) templates driven by
-session state, so the search URL a human copies out of the address bar is
-not fetchable on its own. Newer Taleo instances do expose a JSON REST
-endpoint that the page itself calls; this script works out whether this
-instance has one, and what shape its responses are, before any scraper is
-written against guesses.
+Round 1 established: the host is reachable from GitHub runners (HTTP 200, no
+captcha), the pages carry no server-rendered job rows, and the jobboard REST
+endpoint answers JSON but with careerSectionUnAvailable=true — i.e. it needs
+the career section's numeric portal id, which was not where it was expected
+in the markup.
+
+Round 2 dumps the surrounding markup so the real identifiers and AJAX URLs
+can be read off directly instead of guessed at.
 
 Run via .github/workflows/probe-taleo.yml — the dev sandbox's egress proxy
 blocks this host, GitHub runners reach it fine.
@@ -37,125 +39,83 @@ def banner(title: str) -> None:
     print("=" * 70)
 
 
-def probe_html(session: requests.Session) -> str:
-    """Fetch the career section landing page and report what came back."""
-    banner("1. Landing page (establishes the Taleo session cookie)")
-    urls = [
-        f"{HOST}/careersection/{SECTION}/jobsearch.ftl?lang=en",
-        f"{HOST}/careersection/{SECTION}/moresearch.ftl?searchExpanded=false&lang=en",
-        f"{HOST}/careersection/{SECTION}/jobsearch.ftl",
-    ]
-    html = ""
-    for url in urls:
-        try:
-            resp = session.get(url, headers=HEADERS, timeout=30)
-        except Exception as exc:
-            print(f"  {url}\n    ERROR {exc}")
-            continue
-        print(f"  {url}\n    HTTP {resp.status_code}, {len(resp.text)} bytes")
-        if resp.status_code == 200 and len(resp.text) > len(html):
-            html = resp.text
-    print(f"  cookies now: {sorted(session.cookies.keys())}")
-    return html
-
-
-def report_html_signals(html: str) -> None:
-    """Look for the identifiers a REST call needs, and for inline job data."""
-    banner("2. Signals inside the HTML")
-    if not html:
-        print("  no HTML captured")
-        return
-
-    # Taleo embeds the portal/csrf ids the page's own AJAX calls use.
-    patterns = {
-        "portal id": r'portal["\']?\s*[:=]\s*["\']?(\d{6,})',
-        "csrf token": r'(?:csrf|CSRF)[^"\']{0,20}["\']([A-Za-z0-9_\-]{16,})["\']',
-        "requisition ids": r'requisitionId["\']?\s*[:=]\s*["\']?(\d+)',
-        "jobdetail links": r'(jobdetail\.ftl\?job=[A-Za-z0-9_\-]+)',
-    }
-    for label, pat in patterns.items():
-        hits = re.findall(pat, html)
-        uniq = sorted(set(hits))[:5]
-        print(f"  {label:18s} {len(set(hits))} unique {uniq}")
-
-    lowered = html.lower()
-    for marker in ("jobsearchresultsform", "requisitionlist", "no matching", "captcha", "javascript is required"):
-        print(f"  contains {marker!r}: {marker in lowered}")
-
-
-def probe_rest(session: requests.Session, portal: str | None) -> None:
-    """Try the Taleo jobboard REST endpoint the modern career sections use."""
-    banner(f"3. REST endpoint (portal={portal or 'omitted'})")
-    url = f"{HOST}/careersection/rest/jobboard/searchjobs"
-    params = {"lang": "en"}
-    if portal:
-        params["portal"] = portal
-
-    payload = {
-        "multilineEnabled": False,
-        "sortingSelection": {"sortBySelectionParam": "3", "ascendingSortingOrder": "false"},
-        "fieldData": {"fields": {"KEYWORD": "", "LOCATION": ""}, "valid": True},
-        "filterSelectionParam": {"searchFilterSelections": []},
-        "advancedSearchFiltersSelectionParam": {"searchFilterSelections": []},
-        "pageNo": 1,
-    }
-    headers = dict(HEADERS)
-    headers["Content-Type"] = "application/json"
-    headers["Accept"] = "application/json, text/plain, */*"
-    headers["Referer"] = f"{HOST}/careersection/{SECTION}/jobsearch.ftl?lang=en"
-
-    try:
-        resp = session.post(url, params=params, json=payload, headers=headers, timeout=30)
-    except Exception as exc:
-        print(f"  ERROR {exc}")
-        return
-
-    print(f"  HTTP {resp.status_code}, {len(resp.text)} bytes, ct={resp.headers.get('content-type')}")
-    body = resp.text[:400]
-    try:
-        data = resp.json()
-    except Exception:
-        print(f"  non-JSON body: {body!r}")
-        return
-
-    reqs = (((data or {}).get("requisitionList")) or [])
-    print(f"  requisitionList entries: {len(reqs)}")
-    if reqs:
-        first = reqs[0]
-        print(f"  first entry keys: {sorted(first.keys())}")
-        print(f"  sample: {json.dumps(first)[:700]}")
-    else:
-        print(f"  body head: {json.dumps(data)[:500]}")
-
-
-def probe_rss(session: requests.Session) -> None:
-    """Some Taleo instances publish an RSS feed — far simpler if present."""
-    banner("4. RSS / alternate feeds")
-    candidates = [
-        f"{HOST}/careersection/{SECTION}/rss.ftl?lang=en",
-        f"{HOST}/careersection/rss?lang=en",
-        f"{HOST}/careersection/{SECTION}/jobsearch.ftl?lang=en&format=rss",
-    ]
-    for url in candidates:
-        try:
-            resp = session.get(url, headers=HEADERS, timeout=20)
-            head = resp.text[:120].replace("\n", " ")
-            print(f"  {url}\n    HTTP {resp.status_code}, {len(resp.text)} bytes, head={head!r}")
-        except Exception as exc:
-            print(f"  {url}\n    ERROR {exc}")
+def contexts(html: str, needle: str, width: int = 130, limit: int = 6) -> list[str]:
+    """Snippets of markup around a marker, whitespace-collapsed for logging."""
+    out = []
+    for m in re.finditer(re.escape(needle), html, re.I):
+        lo = max(0, m.start() - width)
+        snippet = html[lo: m.end() + width]
+        out.append(re.sub(r"\s+", " ", snippet).strip())
+        if len(out) >= limit:
+            break
+    return out
 
 
 def main() -> None:
     session = requests.Session()
-    html = probe_html(session)
-    report_html_signals(html)
 
-    portal_ids = sorted(set(re.findall(r'portal["\']?\s*[:=]\s*["\']?(\d{6,})', html or "")))
-    probe_rest(session, None)
-    for portal in portal_ids[:2]:
-        probe_rest(session, portal)
+    banner("Fetch pages")
+    pages: dict[str, str] = {}
+    for label, url in {
+        "jobsearch": f"{HOST}/careersection/{SECTION}/jobsearch.ftl?lang=en",
+        "moresearch": f"{HOST}/careersection/{SECTION}/moresearch.ftl?searchExpanded=false&lang=en",
+    }.items():
+        resp = session.get(url, headers=HEADERS, timeout=30)
+        pages[label] = resp.text
+        print(f"  {label}: HTTP {resp.status_code}, {len(resp.text)} bytes")
 
-    probe_rss(session)
+    for label, html in pages.items():
+        banner(f"[{label}] markup around key markers")
+        for needle in ("requisitionList", "rest/jobboard", "portal", "careerSectionId", "csNo", "ftlUrl"):
+            snips = contexts(html, needle, limit=3)
+            print(f"\n  --- {needle!r}: {len(snips)} shown ---")
+            for s in snips:
+                print(f"    {s[:300]}")
+
+        banner(f"[{label}] candidate numeric ids (>=6 digits)")
+        ids = re.findall(r"\b(\d{6,})\b", html)
+        counts: dict[str, int] = {}
+        for i in ids:
+            counts[i] = counts.get(i, 0) + 1
+        top = sorted(counts.items(), key=lambda kv: -kv[1])[:12]
+        print(f"    {top}")
+
+        banner(f"[{label}] URLs referenced in the page")
+        urls = sorted(set(re.findall(r'["\'](/careersection/[^"\'\s]{3,120})["\']', html)))
+        for u in urls[:25]:
+            print(f"    {u}")
+
+    banner("REST attempts with discovered ids")
+    all_ids = re.findall(r"\b(\d{6,})\b", pages.get("jobsearch", "") + pages.get("moresearch", ""))
+    tried = []
+    for portal in list(dict.fromkeys(all_ids))[:6]:
+        url = f"{HOST}/careersection/rest/jobboard/searchjobs"
+        payload = {
+            "multilineEnabled": False,
+            "sortingSelection": {"sortBySelectionParam": "3", "ascendingSortingOrder": "false"},
+            "fieldData": {"fields": {"KEYWORD": "", "LOCATION": ""}, "valid": True},
+            "filterSelectionParam": {"searchFilterSelections": []},
+            "advancedSearchFiltersSelectionParam": {"searchFilterSelections": []},
+            "pageNo": 1,
+        }
+        h = dict(HEADERS)
+        h.update({
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/plain, */*",
+            "Referer": f"{HOST}/careersection/{SECTION}/jobsearch.ftl?lang=en",
+        })
+        try:
+            r = session.post(url, params={"lang": "en", "portal": portal}, json=payload, headers=h, timeout=25)
+            d = r.json()
+            reqs = (d or {}).get("requisitionList") or []
+            unavailable = (d or {}).get("careerSectionUnAvailable")
+            print(f"  portal={portal}: HTTP {r.status_code} entries={len(reqs)} unavailable={unavailable}")
+            if reqs:
+                print(f"    FIRST: {json.dumps(reqs[0])[:600]}")
+                tried.append(portal)
+        except Exception as exc:
+            print(f"  portal={portal}: ERROR {exc}")
+    print(f"\n  portals returning jobs: {tried}")
 
 
 if __name__ == "__main__":
