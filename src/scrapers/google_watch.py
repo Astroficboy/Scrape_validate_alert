@@ -21,7 +21,13 @@ import requests
 
 from src.models import JobPosting
 from src.scrapers.base import BaseScraper, DEFAULT_HEADERS
-from src.scrapers.google_cse_common import ENDPOINT, is_noise_link
+from src.scrapers.google_cse_common import (
+    ENDPOINT,
+    check_credential_shape,
+    explain_cse_error,
+    is_credential_error,
+    is_noise_link,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +80,9 @@ class GoogleWatchScraper(BaseScraper):
         results_per_query = self.src_cfg.get("results_per_query", 10)
         failures = 0
 
+        for problem in check_credential_shape(self.api_key, self.cse_id):
+            logger.error("[google_watch] %s", problem)
+
         for name, domain, tier_key in companies:
             site_term = f"site:{domain}" if domain else f'"{name}"'
             query = f"{site_term} jobs {ROLE_TERMS} {DOMAIN_TERMS} {LOCATION_TERMS}"
@@ -85,8 +94,24 @@ class GoogleWatchScraper(BaseScraper):
             }
             try:
                 resp = requests.get(ENDPOINT, params=params, headers=DEFAULT_HEADERS, timeout=20)
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    # Google names the cause in the response body; the raw
+                    # status alone is useless when the secrets are masked.
+                    _, explanation = explain_cse_error(resp)
+                    if is_credential_error(resp):
+                        # Every remaining query would fail identically, so stop
+                        # rather than emit one traceback per watched company.
+                        logger.error(
+                            "[google_watch] credential/quota error, abandoning "
+                            "remaining queries -> %s", explanation
+                        )
+                        raise RuntimeError(f"Google Custom Search rejected the request: {explanation}")
+                    logger.error("[google_watch] query for %r failed -> %s", name, explanation)
+                    failures += 1
+                    continue
                 data = resp.json()
+            except RuntimeError:
+                raise
             except Exception:
                 logger.exception("[google_watch] query for %r failed", name)
                 failures += 1

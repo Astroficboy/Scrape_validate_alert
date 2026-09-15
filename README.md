@@ -206,6 +206,43 @@ coverage possible without scraping them.
 5. Free tier is 100 queries/day; `sources.google_search.max_daily_queries`
    (default 90) caps total spend across both Google sources.
 
+**Telling the two secrets apart.** They are easy to mix up, and GitHub masks
+both as `***` in Actions logs, so a wrong value shows up only as an opaque
+`400 Bad Request`:
+
+| Secret | Where it comes from | How to recognise it |
+| --- | --- | --- |
+| `GOOGLE_API_KEY` | Google Cloud Console -> APIs & Services -> Credentials | **always** starts with `AIza`, ~39 chars |
+| `GOOGLE_CSE_ID` | Programmable Search Engine -> Basics -> *Search engine ID* | short alphanumeric string, **never** starts with `AIza` |
+
+`GOOGLE_CSE_ID` is the bare ID only — the value after `cx=` in the Public
+URL, not `https://cse.google.com/cse?cx=...` itself.
+
+**If the Google sources fail.** The run logs Google's own error reason and a
+suggested fix rather than a bare status code, and stops after the first
+credential-level rejection instead of repeating the same failure once per
+query. Read the `FIX:` line in the Actions log:
+
+- `reason=keyInvalid` -> `GOOGLE_API_KEY` is wrong (check it starts with `AIza`).
+- `reason=badRequest` / `invalid` -> `GOOGLE_CSE_ID` is wrong (see above).
+- `reason=accessNotConfigured` -> enable **Custom Search API** in Cloud
+  Console for the project that owns the key.
+- `reason=ipRefererBlocked` -> the key has an Application restriction that
+  blocks the Actions runner; set Application restrictions to **None**.
+- `reason=dailyLimitExceeded` -> the 100/day quota is spent; lower
+  `max_daily_queries`.
+
+The pipeline also pre-checks the *shape* of both secrets before spending any
+quota, so an obviously swapped or pasted-URL value is reported without
+burning a query.
+
+To verify a pair by hand, open this in a browser (substitute your own values)
+— the JSON reply names the exact problem:
+
+```
+https://www.googleapis.com/customsearch/v1?key=YOUR_API_KEY&cx=YOUR_CSE_ID&q=test
+```
+
 ### 2b. Adzuna API (optional — currently disabled)
 
 Adzuna doesn't cover the UAE (see above), so this isn't needed unless you

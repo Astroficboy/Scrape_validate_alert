@@ -18,7 +18,15 @@ import requests
 
 from src.models import JobPosting
 from src.scrapers.base import BaseScraper, DEFAULT_HEADERS
-from src.scrapers.google_cse_common import ENDPOINT, company_from, is_noise_link, location_from
+from src.scrapers.google_cse_common import (
+    ENDPOINT,
+    check_credential_shape,
+    company_from,
+    explain_cse_error,
+    is_credential_error,
+    is_noise_link,
+    location_from,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +70,9 @@ class GoogleDiscoveryScraper(BaseScraper):
 
         logger.info("[google_discovery] %d quer(ies) (budget=%s)", len(queries), self.query_budget)
 
+        for problem in check_credential_shape(self.api_key, self.cse_id):
+            logger.error("[google_discovery] %s", problem)
+
         for query in queries:
             params = {
                 "key": self.api_key,
@@ -75,8 +86,20 @@ class GoogleDiscoveryScraper(BaseScraper):
                 if resp.status_code == 429:
                     logger.warning("[google_discovery] daily Google quota exhausted — stopping")
                     break
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    _, explanation = explain_cse_error(resp)
+                    if is_credential_error(resp):
+                        logger.error(
+                            "[google_discovery] credential/quota error, abandoning "
+                            "remaining queries -> %s", explanation
+                        )
+                        raise RuntimeError(f"Google Custom Search rejected the request: {explanation}")
+                    logger.error("[google_discovery] query %r failed -> %s", query, explanation)
+                    failures += 1
+                    continue
                 data = resp.json()
+            except RuntimeError:
+                raise
             except Exception:
                 logger.exception("[google_discovery] query %r failed", query)
                 failures += 1
