@@ -223,7 +223,16 @@ sources:
   google_search:
     max_daily_queries: 90
   google_discovery:
-    enabled: true
+    # DISABLED Sept 2026. Every query returns HTTP 403 "This project does not
+    # have the access to Custom Search JSON API", verified directly against
+    # the endpoint (not just from CI) with a valid 39-char key belonging to
+    # the same Cloud project whose console shows that API enabled, and after
+    # the enablement propagation window. The refusal is project-state on
+    # Google's side — most likely billing/free-trial standing — not anything
+    # this repo controls. Left wired up rather than deleted: flip both Google
+    # sources back to true once the project is in good standing (or a fresh
+    # project is used) and they resume with no code change.
+    enabled: false
     # Broad discovery: (title from search.queries) x (suffix) per query,
     # so this also catches roles at companies outside priority_targets
     # entirely — careers pages, ATS boards, Workday postings that never
@@ -236,7 +245,8 @@ sources:
       - "UAE site:*.workday.com OR site:*.myworkdayjobs.com"
       - "site:builtin.com OR site:jobs.techstars.com Dubai"
   google_watch:
-    enabled: true
+    # DISABLED Sept 2026 — same 403 as google_discovery above; see that note.
+    enabled: false
     # Each `watch: true` company in priority_targets below costs exactly one
     # query per run (fallback budget if google_discovery is disabled/fails
     # to report spend — normally main.py computes the real remainder).
@@ -256,9 +266,15 @@ digest:
 #
 # Each tier's `bonus` is added to a job's match score, so an equivalent role
 # at Emirates NBD outranks one at an unknown integrator. Companies match by
-# `name` appearing in the job title/company/description, and by `domain`
-# appearing in the job URL. `watch: true` spends one Google query per run on
-# that company — keep watched companies under the daily_query_budget above.
+# the `name` in the job's company field and by `domain` in the job URL —
+# never the description, since AWS/Databricks/Oracle appear constantly as
+# required skills and would wrongly tag half the feed as big tech.
+#
+# `watch: true` spends one Google query per run on that company. Both Google
+# sources are currently disabled (see sources.google_discovery), so these
+# flags are inert right now — they are kept so the watch list is ready the
+# moment Google is switched back on. Score bonuses are unaffected and still
+# apply to every job from every source.
 # ---------------------------------------------------------------------------
 priority_targets:
 

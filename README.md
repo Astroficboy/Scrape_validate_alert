@@ -146,7 +146,26 @@ coverage possible without scraping them.
 4. `IMAP_USER`/`IMAP_PASSWORD` default to `EMAIL_ADDRESS`/`EMAIL_APP_PASSWORD`
    below — only set them separately if the alerts land in a different inbox.
 
-### 2. Google Custom Search (free, powers broad discovery + the priority-company watch)
+### 2. Google Custom Search — CURRENTLY DISABLED (optional)
+
+> **Status: switched off in `config.yaml`.** Every query returned HTTP 403,
+> `"This project does not have the access to Custom Search JSON API"`, and
+> the usual causes were each ruled out by direct testing against the
+> endpoint: the API key was valid and complete (Google answered `forbidden`,
+> not `invalid`), it belonged to the same Cloud project whose console showed
+> Custom Search API **Enabled**, the `cx` was correct, and the failure
+> persisted well past the enablement propagation window. What remains is
+> project standing on Google's side — most often a Cloud free trial that
+> ended without upgrading, which suspends a project's API access while the
+> console still displays those APIs as enabled.
+>
+> The pipeline runs fine without it (see *Why these job sources*). **Skip
+> this section** unless you want the extra breadth. To re-enable: fix the
+> project's billing standing (or create a fresh project and redo the three
+> steps below in it), confirm the key works in a browser, then set
+> `sources.google_discovery.enabled` and `sources.google_watch.enabled`
+> back to `true`. No code changes needed — the scrapers, the shared query
+> budget, and the `watch: true` company list are all still wired up.
 
 1. In a Google Cloud project, enable the "Custom Search API" and create an
    API key — this is `GOOGLE_API_KEY`.
@@ -437,11 +456,19 @@ doesn't grow forever.
   unverified until you run `python scripts/check_boards.py` — do that before
   (or right after) adding a company, and periodically since companies
   migrate ATS.
-- Google Custom Search results (both discovery and company-watch) are a
-  best-effort signal, not a guarantee: `site:domain`/broad search results
-  can include stale, unrelated, or non-Dubai pages — the digest flags these
-  postings as "targeted search — verify on click-through" rather than
-  asserting the location as fact.
+- Both Google Custom Search sources are **disabled** (see setup step 2 for
+  the diagnosis). Consequence worth knowing: the UAE-headquartered employers
+  in `priority_targets` that run no public ATS board — Talabat, noon, Tabby,
+  Property Finder, Dubizzle, Kitopi, DP World, Aramex, Emirates Group, and
+  the banks — are currently reachable **only** through the job-alert-email
+  route in setup step 1. Until you create those saved alerts, the feed is
+  effectively ATS boards only. Their `priority_targets` score bonuses still
+  apply to any matching job arriving from any source.
+- When Google is re-enabled, its results are a best-effort signal rather
+  than a guarantee: `site:domain`/broad search results can include stale,
+  unrelated, or non-Dubai pages — the digest flags those postings as
+  "targeted search — verify on click-through" rather than asserting the
+  location as fact.
 - LinkedIn and Indeed are **not scraped directly** — both aggressively block
   automated/unauthenticated scraping. Instead, `src/scrapers/email_alerts.py`
   reads the board's own daily alert emails over IMAP (see setup step 1),
