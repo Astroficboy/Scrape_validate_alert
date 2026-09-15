@@ -46,6 +46,18 @@ def test_non_json_error_body_still_returns_something_useful():
     assert "502" in human
 
 
+def test_api_not_enabled_tells_you_to_enable_it():
+    # The failure actually hit in production: valid key, valid cx, but the
+    # Custom Search API was never switched on for the key's Cloud project.
+    resp = _google_error(
+        "forbidden",
+        "This project does not have the access to Custom Search JSON API.",
+        code=403,
+    )
+    _, human = explain_cse_error(resp)
+    assert "Enable" in human and "Custom Search" in human
+
+
 def test_credential_errors_stop_the_run_but_transient_ones_do_not():
     assert is_credential_error(_google_error("keyInvalid", "bad key"))
     assert is_credential_error(_google_error("accessNotConfigured", "API disabled", code=403))

@@ -225,8 +225,11 @@ query. Read the `FIX:` line in the Actions log:
 
 - `reason=keyInvalid` -> `GOOGLE_API_KEY` is wrong (check it starts with `AIza`).
 - `reason=badRequest` / `invalid` -> `GOOGLE_CSE_ID` is wrong (see above).
-- `reason=accessNotConfigured` -> enable **Custom Search API** in Cloud
-  Console for the project that owns the key.
+- `reason=forbidden` / `accessNotConfigured` ("this project does not have
+  access to Custom Search JSON API") -> the key is valid but the API is not
+  switched on. Creating an API key does not enable any API by itself: go to
+  Cloud Console -> **APIs & Services -> Library**, search **Custom Search
+  API**, and press **Enable** on the *same project* the key belongs to.
 - `reason=ipRefererBlocked` -> the key has an Application restriction that
   blocks the Actions runner; set Application restrictions to **None**.
 - `reason=dailyLimitExceeded` -> the 100/day quota is spent; lower

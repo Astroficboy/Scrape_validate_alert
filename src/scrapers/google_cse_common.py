@@ -67,6 +67,12 @@ _REMEDIES = {
         "The Custom Search API is not enabled for the project that owns this "
         "key. Enable 'Custom Search API' in Google Cloud Console -> APIs & Services."
     ),
+    "forbidden": (
+        "Almost always 'this project does not have access to Custom Search "
+        "JSON API' — creating an API key does not enable any API. Go to Google "
+        "Cloud Console -> APIs & Services -> Library, search 'Custom Search "
+        "API', and press Enable on the SAME project the key belongs to."
+    ),
     "ipreferrerblocked": (
         "The API key has an Application restriction (HTTP referrer / IP) that "
         "blocks the GitHub Actions runner. Set Application restrictions to "
