@@ -97,7 +97,12 @@ four legitimate routes:
   - `src/scrapers/google_discovery.py` — broad (title × suffix) search
     across `search.queries` × `sources.google_discovery.suffixes`, catching
     roles at companies entirely outside `priority_targets` (career pages,
-    Workday postings, ATS boards that never reach aggregators).
+    Workday postings, ATS boards that never reach aggregators). Scoped to
+    the curated job-board/ATS/company domain list configured on the
+    Programmable Search Engine itself (see setup step 2) — Google
+    deprecated "search the entire web" for new engines, so this was never
+    going to be unrestricted anyway; the curated list keeps results
+    job-relevant by construction rather than needing noise-filtering.
   - `src/scrapers/google_watch.py` — one targeted query per `watch: true`
     company in `priority_targets`, restricted to that company's domain.
     Currently 16 watched companies.
@@ -146,9 +151,59 @@ coverage possible without scraping them.
 1. In a Google Cloud project, enable the "Custom Search API" and create an
    API key — this is `GOOGLE_API_KEY`.
 2. Create a Programmable Search Engine at
-   https://programmablesearchengine.google.com/, set it to "Search the
-   entire web", and copy its Search engine ID — this is `GOOGLE_CSE_ID`.
-3. Free tier is 100 queries/day; `sources.google_search.max_daily_queries`
+   https://programmablesearchengine.google.com/. Give it any name and,
+   since a "Sites to search" entry is required to create it, add any one
+   placeholder domain to get past that screen (you'll replace it next).
+3. **"Search the entire web" is deprecated for new engines** — Google now
+   restricts it to legacy engines created before the cutoff, so there's no
+   toggle for it anymore. Instead, open the created engine's control panel
+   → Basics → "Sites to search", and replace the placeholder with this
+   curated list of job-relevant domains (well under Google's 50-domain cap
+   per engine):
+
+   ```
+   linkedin.com/jobs/*
+   *.indeed.com
+   bayt.com/*
+   naukrigulf.com/*
+   gulftalent.com/*
+   monstergulf.com/*
+   glassdoor.com/*
+   boards.greenhouse.io/*
+   jobs.lever.co/*
+   *.myworkdayjobs.com
+   *.workday.com
+   *.smartrecruiters.com
+   *.icims.com
+   emiratesnbd.com/*
+   bankfab.com/*
+   mashreqbank.com/*
+   adcb.com/*
+   g42.ai/*
+   core42.ai/*
+   presight.ai/*
+   adnoc.ae/*
+   google.com/*
+   microsoft.com/*
+   amazon.jobs/*
+   careem.com/*
+   noon.com/*
+   talabat.com/*
+   dpworld.com/*
+   emiratesgroupcareers.com/*
+   ```
+
+   This is job boards + ATS platforms (google_discovery's territory) plus
+   the 16 `watch: true` companies from `priority_targets` (google_watch's
+   territory) — no code needs to know about this list, since the site
+   restriction is enforced by Google on the engine itself regardless of
+   the query text sent to it. If you add/re-tier `watch: true` companies
+   in `config.yaml` later, add their domain here too, or the watch query
+   for that company will return zero results (filtered out server-side by
+   the engine, not by an error).
+4. Copy the **Search engine ID** from the same Basics page — this is
+   `GOOGLE_CSE_ID`.
+5. Free tier is 100 queries/day; `sources.google_search.max_daily_queries`
    (default 90) caps total spend across both Google sources.
 
 ### 2b. Adzuna API (optional — currently disabled)
