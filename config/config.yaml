@@ -176,25 +176,36 @@ sources:
   greenhouse:
     enabled: true
     # boards-api.greenhouse.io/v1/boards/<token>/jobs — token comes from the
-    # company's careers page URL (boards.greenhouse.io/<token>). Verified
-    # live via scripts/check_boards.py (Sept 2026): datacamp (33 jobs, 8
-    # UAE), careem (20 jobs, 12 UAE), bybit (152 jobs, 61 UAE). Pruned:
-    # tabby, kitopi, propertyfinder, talabat, binance (all 404 — wrong
-    # token or not on Greenhouse; re-run check_boards.py periodically since
-    # companies migrate ATS).
+    # company's careers page URL (boards.greenhouse.io/<token>). Every token
+    # below was confirmed live by scripts/check_boards.py (Sept 2026); the
+    # UAE counts are from that sweep and will drift, so re-run it
+    # periodically — companies migrate ATS and boards go quiet.
     companies:
-      - datacamp
-      - careem
-      - bybit
+      # Currently listing UAE roles:
+      - bybit        # 160 jobs, 61 UAE
+      - careem       # 21 jobs, 11 UAE
+      - okx          # 343 jobs, 9 UAE
+      - datacamp     # 34 jobs, 8 UAE
+      - binance      # 10 jobs, 2 UAE
+      - scaleai      # 228 jobs, 2 UAE
+      - databricks   # 892 jobs, 1 UAE
+      # Board is live but had no UAE roles during the sweep. Each costs one
+      # request/day and the location gate drops non-UAE rows anyway, so the
+      # only cost of keeping them is that request — worth it for employers
+      # that plausibly open a Dubai role.
+      - anthropic    # 596 jobs
+      - thoughtworks # 45 jobs
+      - bitpanda     # 24 jobs
+      - turing       # 19 jobs
   lever:
     enabled: true
     # api.lever.co/v0/postings/<slug> — slug comes from jobs.lever.co/<slug>.
-    # Verified via scripts/check_boards.py (Sept 2026): every guessed slug
-    # (tabby, alefeducation, huspy, sarwa, ziina, nybl) 404'd — none of these
-    # companies are on Lever under those slugs. Left empty; add real slugs
-    # here once found (check a company's careers page for a jobs.lever.co
-    # redirect, or re-run check_boards.py after adding candidates).
-    companies: []
+    # Confirmed live by scripts/check_boards.py (Sept 2026). Note Binance
+    # runs both a Lever and a Greenhouse board with different postings, so
+    # both are listed; canonical_url() dedupes anything that overlaps.
+    companies:
+      - binance      # 292 jobs, 11 UAE
+      - palantir     # 314 jobs, 4 UAE
   bayt:
     enabled: true
     # Best-effort HTML scraper — Bayt's markup can change without notice,
@@ -297,6 +308,12 @@ priority_targets:
       - {name: "Snowflake",           domain: "snowflake.com",  watch: false}
       - {name: "IBM",                 domain: "ibm.com",        watch: false}
       - {name: "SAP",                 domain: "sap.com",        watch: false}
+      # Added Sept 2026 after check_boards.py confirmed each runs a live
+      # public ATS board (now in sources.greenhouse/lever). watch:false so
+      # they cost no Google query — the board scrape already covers them.
+      - {name: "Anthropic",           domain: "anthropic.com",  watch: false}
+      - {name: "Scale AI",            domain: "scale.com",      watch: false}
+      - {name: "Palantir",            domain: "palantir.com",   watch: false}
 
   # ---------------------------------------------------------------- TIER 2
   product_tech:
@@ -326,6 +343,7 @@ priority_targets:
       - {name: "Bybit",      domain: "bybit.com",    watch: false}
       - {name: "OKX",        domain: "okx.com",      watch: false}
       - {name: "Crypto.com", domain: "crypto.com",   watch: false}
+      - {name: "Bitpanda",   domain: "bitpanda.com", watch: false}
 
   # ---------------------------------------------------------------- TIER 3
   # Negative bonus — still surfaced, but pushed down. These rarely clear 45k,
@@ -343,3 +361,5 @@ priority_targets:
       - {name: "Cognizant",         domain: "cognizant.com",    watch: false}
       - {name: "LTIMindtree",       domain: "ltimindtree.com",  watch: false}
       - {name: "Capgemini",         domain: "capgemini.com",    watch: false}
+      - {name: "Thoughtworks",      domain: "thoughtworks.com", watch: false}
+      - {name: "Turing",            domain: "turing.com",       watch: false}

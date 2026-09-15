@@ -313,10 +313,34 @@ manual step after this.
 `config.yaml` ships pre-populated with two things, both fully editable:
 
 - `sources.greenhouse.companies` / `sources.lever.companies` — Greenhouse/
-  Lever board tokens, verified live via `scripts/check_boards.py`. Add new
-  candidates freely and re-run `python scripts/check_boards.py` (or the
-  `check-boards.yml` workflow from the Actions tab) to see which resolve
-  before adding them to `config.yaml`.
+  Lever board tokens, every one confirmed live by `scripts/check_boards.py`.
+
+  The checker has two modes:
+
+  ```bash
+  # Re-verify the tokens already in config.yaml (do this every month or so —
+  # companies migrate ATS and boards go quiet without warning).
+  python scripts/check_boards.py
+
+  # Probe scripts/candidate_boards.txt for boards worth adding.
+  python scripts/check_boards.py --candidates scripts/candidate_boards.txt
+  ```
+
+  The candidate sweep sorts results into *has UAE postings* (add these),
+  *board is live but no UAE roles today* (cheap to add — one request/day,
+  and the location gate drops non-UAE rows anyway) and *no such board*.
+  Dead guesses stay in `candidate_boards.txt` commented out rather than
+  deleted, so a later sweep doesn't re-guess them.
+
+  Run either mode from the Actions tab via the **Verify Greenhouse/Lever
+  Board Tokens** workflow, picking `configured` or `candidates` — useful
+  because these APIs block many sandbox networks but not Actions runners.
+
+  Most UAE-headquartered firms (Talabat, noon, Tabby, Property Finder,
+  Dubizzle, Kitopi, DP World, Aramex) turned out **not** to run public
+  Greenhouse/Lever boards at all — they're on Workday, SuccessFactors or
+  in-house portals with no open JSON API. Those are reachable only through
+  the job-alert-email route (step 1) or Google Custom Search (step 2).
 - `priority_targets` — tiered lists of target companies (banks, sovereign-AI,
   big tech, product/tech, crypto, deprioritised IT-services firms) with a
   per-tier score bonus and a `watch: true` flag for the ones worth spending

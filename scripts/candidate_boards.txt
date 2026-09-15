@@ -1,112 +1,114 @@
 # Candidate ATS boards to probe with:
 #   python scripts/check_boards.py --candidates scripts/candidate_boards.txt
+# or the check-boards workflow with mode=candidates.
 #
-# These are GUESSES at each company's Greenhouse/Lever token — most will 404.
-# Only the ones the probe reports as resolving belong in config.yaml. Keeping
-# the rejects listed (commented by the report, not deleted here) stops us from
-# re-guessing the same dead tokens on the next sweep.
+# Lines are GUESSES at each company's Greenhouse/Lever token. Tokens the last
+# sweep proved dead are commented out rather than deleted, so a later sweep
+# doesn't waste time re-guessing them — uncomment one to re-test if you think
+# a company has since moved onto that ATS. Tokens marked LIVE are already
+# wired into config.yaml.
 
 # --- UAE product/tech (priority_targets: product_tech) ---
-greenhouse careem
-lever careem
-greenhouse talabat
-lever talabat
-greenhouse noon
-lever noon
-greenhouse tabby
-lever tabby
-greenhouse kitopi
-lever kitopi
-greenhouse propertyfinder
-lever propertyfinder
-greenhouse propertyfindergroup
-greenhouse dubizzle
-lever dubizzle
-greenhouse bayut
-greenhouse dubizzlegroup
-greenhouse emergingmarketspropertygroup
-greenhouse aramex
-greenhouse dpworld
-lever dpworld
-greenhouse swvl
-lever swvl
-greenhouse bazaar
-greenhouse alef
-greenhouse pure
-greenhouse huspy
-lever huspy
-greenhouse sarwa
-lever sarwa
-greenhouse ziina
-lever ziina
-greenhouse postpay
-greenhouse yallacompare
-greenhouse trukker
-greenhouse fetchr
-greenhouse washmen
-greenhouse mrusta
-greenhouse cafu
-lever cafu
-greenhouse lean
-lever leantech
-greenhouse pemo
-greenhouse alaan
-lever alaan
+greenhouse careem  # LIVE — now in config.yaml
+# lever careem  # 404 as of Sept 2026 sweep
+# greenhouse talabat  # 404 as of Sept 2026 sweep
+# lever talabat  # 404 as of Sept 2026 sweep
+# greenhouse noon  # 404 as of Sept 2026 sweep
+# lever noon  # 404 as of Sept 2026 sweep
+# greenhouse tabby  # 404 as of Sept 2026 sweep
+# lever tabby  # 404 as of Sept 2026 sweep
+# greenhouse kitopi  # 404 as of Sept 2026 sweep
+# lever kitopi  # 404 as of Sept 2026 sweep
+# greenhouse propertyfinder  # 404 as of Sept 2026 sweep
+# lever propertyfinder  # 404 as of Sept 2026 sweep
+# greenhouse propertyfindergroup  # 404 as of Sept 2026 sweep
+# greenhouse dubizzle  # 404 as of Sept 2026 sweep
+# lever dubizzle  # 404 as of Sept 2026 sweep
+# greenhouse bayut  # 404 as of Sept 2026 sweep
+# greenhouse dubizzlegroup  # 404 as of Sept 2026 sweep
+# greenhouse emergingmarketspropertygroup  # 404 as of Sept 2026 sweep
+# greenhouse aramex  # 404 as of Sept 2026 sweep
+# greenhouse dpworld  # 404 as of Sept 2026 sweep
+# lever dpworld  # 404 as of Sept 2026 sweep
+# greenhouse swvl  # 404 as of Sept 2026 sweep
+# lever swvl  # 404 as of Sept 2026 sweep
+# greenhouse bazaar  # 404 as of Sept 2026 sweep
+# greenhouse alef  # 404 as of Sept 2026 sweep
+# greenhouse pure  # 404 as of Sept 2026 sweep
+# greenhouse huspy  # 404 as of Sept 2026 sweep
+# lever huspy  # 404 as of Sept 2026 sweep
+# greenhouse sarwa  # 404 as of Sept 2026 sweep
+# lever sarwa  # 404 as of Sept 2026 sweep
+# greenhouse ziina  # 404 as of Sept 2026 sweep
+# lever ziina  # 404 as of Sept 2026 sweep
+# greenhouse postpay  # 404 as of Sept 2026 sweep
+# greenhouse yallacompare  # 404 as of Sept 2026 sweep
+# greenhouse trukker  # 404 as of Sept 2026 sweep
+# greenhouse fetchr  # 404 as of Sept 2026 sweep
+# greenhouse washmen  # 404 as of Sept 2026 sweep
+# greenhouse mrusta  # 404 as of Sept 2026 sweep
+# greenhouse cafu  # 404 as of Sept 2026 sweep
+# lever cafu  # 404 as of Sept 2026 sweep
+# greenhouse lean  # 404 as of Sept 2026 sweep
+# lever leantech  # 404 as of Sept 2026 sweep
+# greenhouse pemo  # 404 as of Sept 2026 sweep
+# greenhouse alaan  # 404 as of Sept 2026 sweep
+# lever alaan  # 404 as of Sept 2026 sweep
 
 # --- Crypto / fintech with UAE hubs (priority_targets: crypto) ---
-greenhouse bybit
-greenhouse binance
-lever binance
-greenhouse okx
-lever okx
-greenhouse cryptocom
-greenhouse crypto
-greenhouse kraken
-lever kraken
-greenhouse deribit
-lever deribit
-greenhouse rain
-lever rain
-greenhouse bitpanda
-greenhouse checkout
-greenhouse checkoutcom
-greenhouse mamopay
-greenhouse fuzepay
+greenhouse bybit  # LIVE — now in config.yaml
+greenhouse binance  # LIVE — now in config.yaml
+lever binance  # LIVE — now in config.yaml
+greenhouse okx  # LIVE — now in config.yaml
+# lever okx  # 404 as of Sept 2026 sweep
+# greenhouse cryptocom  # 404 as of Sept 2026 sweep
+# greenhouse crypto  # 404 as of Sept 2026 sweep
+# greenhouse kraken  # 404 as of Sept 2026 sweep
+# lever kraken  # resolves but board is empty (0 jobs)
+# greenhouse deribit  # 404 as of Sept 2026 sweep
+# lever deribit  # 404 as of Sept 2026 sweep
+# greenhouse rain  # 404 as of Sept 2026 sweep
+# lever rain  # 404 as of Sept 2026 sweep
+greenhouse bitpanda  # LIVE — now in config.yaml
+# greenhouse checkout  # 404 as of Sept 2026 sweep
+# greenhouse checkoutcom  # 404 as of Sept 2026 sweep
+# greenhouse mamopay  # 404 as of Sept 2026 sweep
+# greenhouse fuzepay  # 404 as of Sept 2026 sweep
 
 # --- Sovereign AI / government-linked (priority_targets: sovereign_ai) ---
-greenhouse g42
-lever g42
-greenhouse core42
-lever core42
-greenhouse presight
-greenhouse bayanat
-greenhouse m42
-greenhouse mubadala
-greenhouse tii
-greenhouse mbzuai
-lever mbzuai
+# greenhouse g42  # 404 as of Sept 2026 sweep
+# lever g42  # 404 as of Sept 2026 sweep
+# greenhouse core42  # 404 as of Sept 2026 sweep
+# lever core42  # 404 as of Sept 2026 sweep
+# greenhouse presight  # 404 as of Sept 2026 sweep
+# greenhouse bayanat  # 404 as of Sept 2026 sweep
+# greenhouse m42  # 404 as of Sept 2026 sweep
+# greenhouse mubadala  # 404 as of Sept 2026 sweep
+# greenhouse tii  # 404 as of Sept 2026 sweep
+# greenhouse mbzuai  # 404 as of Sept 2026 sweep
+# lever mbzuai  # 404 as of Sept 2026 sweep
 
 # --- Big tech / AI labs with MENA presence (priority_targets: big_tech) ---
-greenhouse databricks
-greenhouse snowflake
-greenhouse datacamp
-greenhouse cohere
-greenhouse anthropic
-greenhouse scaleai
-greenhouse openai
-lever palantir
+greenhouse databricks  # LIVE — now in config.yaml
+# greenhouse snowflake  # 404 as of Sept 2026 sweep
+greenhouse datacamp  # LIVE — now in config.yaml
+# greenhouse cohere  # 404 as of Sept 2026 sweep
+greenhouse anthropic  # LIVE — now in config.yaml
+greenhouse scaleai  # LIVE — now in config.yaml
+# greenhouse openai  # 404 as of Sept 2026 sweep
+lever palantir  # LIVE — now in config.yaml
 
 # --- Consultancies and scale-ups that staff Dubai AI teams ---
-greenhouse quantumblack
-greenhouse thoughtworks
-lever thoughtworks
-greenhouse publicissapient
-greenhouse endava
-lever endava
-greenhouse globant
-greenhouse epam
-greenhouse turing
-lever turing
-greenhouse andela
-lever andela
-greenhouse toptal
+# greenhouse quantumblack  # 404 as of Sept 2026 sweep
+greenhouse thoughtworks  # LIVE — now in config.yaml
+# lever thoughtworks  # 404 as of Sept 2026 sweep
+# greenhouse publicissapient  # 404 as of Sept 2026 sweep
+# greenhouse endava  # 404 as of Sept 2026 sweep
+# lever endava  # 404 as of Sept 2026 sweep
+# greenhouse globant  # 404 as of Sept 2026 sweep
+# greenhouse epam  # 404 as of Sept 2026 sweep
+greenhouse turing  # LIVE — now in config.yaml
+# lever turing  # 404 as of Sept 2026 sweep
+# greenhouse andela  # 404 as of Sept 2026 sweep
+# lever andela  # 404 as of Sept 2026 sweep
+# greenhouse toptal  # 404 as of Sept 2026 sweep
