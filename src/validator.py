@@ -29,6 +29,33 @@ def _contains_word(text: str, needles: list[str]) -> bool:
     return any(re.search(rf"(?<!\w){re.escape(n.lower())}(?!\w)", text_l) for n in needles)
 
 
+def _contains_topic(text: str, needles: list[str]) -> bool:
+    """Domain matching, where a needle's shape says how to match it.
+
+    A single-token needle ("ai", "llm", "nlp", "engineering") is matched
+    word-bounded: plain substring matching lets "ai" fire inside maintenance,
+    available, email, detail and training, which passes essentially any
+    posting and makes the domain gate a no-op. That stayed hidden while every
+    source was a tech board — it becomes glaring against a general-purpose
+    careers portal, where "laboratory equipment maintenance technician" would
+    otherwise read as an AI role.
+
+    A multi-token needle ("data scien", "machine learning", " ml ") keeps
+    substring matching: the spaces already supply the boundary, and some are
+    deliberately written as prefixes — "data scien" must still match both
+    "data science" and "data scientist".
+    """
+    text_l = text.lower()
+    for needle in needles:
+        n = needle.lower()
+        if " " in n.strip():
+            if n in text_l:
+                return True
+        elif re.search(rf"(?<!\w){re.escape(n.strip())}(?!\w)", text_l):
+            return True
+    return False
+
+
 def _normalize_salary_to_aed(amount: float, currency: str | None, fx_table: dict) -> float | None:
     currency = (currency or "AED").upper()
     rate = fx_table.get(currency)
@@ -193,7 +220,7 @@ def validate_and_score(jobs: list[JobPosting], config: dict) -> list[JobPosting]
             continue
 
         # Must be AI/ML/engineering domain.
-        is_domain = _contains_any(blob, domain_kw)
+        is_domain = _contains_topic(blob, domain_kw)
         if not is_domain:
             rejected["not AI/engineering domain"] += 1
             continue

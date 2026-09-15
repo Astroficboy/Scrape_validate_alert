@@ -84,6 +84,16 @@ four legitimate routes:
   scraping, no bot detection, no account risk, and it doesn't break when a
   site redesigns. One-time setup cost: creating ~30 saved searches by hand
   (see below).
+- **Dubai Careers** (`src/scrapers/dubai_careers.py`) — the Government of
+  Dubai's Oracle Taleo portal, covering the government entities (RTA, Dubai
+  Municipality, DEWA, Dubai Police, Digital Dubai, the cultural authorities)
+  that run no public ATS board. Taleo is session-driven and exposes no
+  usable JSON API on this instance, but the search page embeds its full
+  result set in a hidden `initialHistory` field; the scraper parses that and
+  builds a real `jobdetail.ftl?job=<id>` link per posting. Roughly the 25
+  most recent openings, which suits a daily run. See
+  `scripts/check_boards.py`'s sibling `scripts/probe_taleo.py` if the parse
+  ever breaks — it dumps the live page structure.
 - **Greenhouse** / **Lever** — most tech companies' own ATS expose a public,
   unauthenticated JSON jobs API (`boards-api.greenhouse.io`, `api.lever.co`).
   `config.yaml`'s Greenhouse list is verified live (via `scripts/check_boards.py`,
@@ -477,6 +487,15 @@ doesn't grow forever.
   extraction can occasionally misfire on an unusual email layout), and if a
   board changes its alert email template the URL-pattern classifier in
   `email_alerts.py` may need a small update.
+- Dubai Careers postings carry listing-level detail only (title, employer,
+  job category, posting date) — the full description lives behind the
+  posting link, which the scraper deliberately does not fetch per job. The
+  validator's thin-data cap therefore applies to them, so they rank below
+  equivalently-matched roles with a full description. Open the link to read
+  the requirements.
+- Dubai Careers postings are labelled `Dubai, UAE` by construction, since
+  the portal only carries Government of Dubai roles. If Dubai Careers ever
+  lists a role outside the emirate, it will still be labelled this way.
 - Years-of-experience extraction (`_extract_required_years` in
   `validator.py`) is a regex heuristic over free text ("5+ years", "8-10
   yrs") — it can miss unusually phrased requirements; treated as a soft

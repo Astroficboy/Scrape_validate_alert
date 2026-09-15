@@ -206,6 +206,18 @@ sources:
     companies:
       - binance      # 292 jobs, 11 UAE
       - palantir     # 314 jobs, 4 UAE
+  dubai_careers:
+    enabled: true
+    # Government of Dubai's Oracle Taleo portal (jobs.dubaicareers.ae).
+    # Covers the government entities — RTA, Dubai Municipality, DEWA, Dubai
+    # Police, Smart Dubai and the rest — which run no public ATS board and
+    # are otherwise unreachable now that Google search is off.
+    #
+    # The page returns roughly the 25 most recent postings, which is the
+    # right window for a daily run; dedup handles repeats across days.
+    # Leave search_url unset to use the default listing, or paste a filtered
+    # Dubai Careers search URL here to narrow it.
+    search_url: ""
   bayt:
     enabled: true
     # Best-effort HTML scraper — Bayt's markup can change without notice,

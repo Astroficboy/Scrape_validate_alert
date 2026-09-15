@@ -24,6 +24,7 @@ from src.notifiers.email_notifier import send_email
 from src.notifiers.whatsapp_notifier import send_whatsapp
 from src.scrapers.adzuna import AdzunaScraper
 from src.scrapers.bayt import BaytScraper
+from src.scrapers.dubai_careers import DubaiCareersScraper
 from src.scrapers.email_alerts import EmailAlertsScraper
 from src.scrapers.google_discovery import GoogleDiscoveryScraper
 from src.scrapers.google_watch import GoogleWatchScraper
@@ -55,6 +56,7 @@ def run() -> int:
         AdzunaScraper(config, secrets.adzuna_app_id, secrets.adzuna_app_key),
         GreenhouseScraper(config),
         LeverScraper(config),
+        DubaiCareersScraper(config),
         BaytScraper(config),
         discovery_scraper,
         GoogleWatchScraper(config, secrets.google_api_key, secrets.google_cse_id, query_budget=watch_budget),
