@@ -99,13 +99,33 @@ _REMEDIES = {
 }
 
 
+def _error_metadata(err: dict) -> dict:
+    """Pulls Google's google.rpc.ErrorInfo metadata out of an error body.
+
+    This is the part that actually resolves a "but I DID enable it" standoff:
+    `consumer` names the project the API key resolves to (as a project
+    number), and `activationUrl` is a link that enables the API on *that*
+    project. When the console shows the API enabled but calls still 403, the
+    key belongs to a different project than the one being looked at, and this
+    is what proves it. Project numbers are identifiers, not credentials — the
+    key and cx are still never logged.
+    """
+    for detail in err.get("details") or []:
+        if not isinstance(detail, dict):
+            continue
+        meta = detail.get("metadata")
+        if isinstance(meta, dict) and meta:
+            return {k: str(v) for k, v in meta.items()}
+    return {}
+
+
 def explain_cse_error(resp) -> tuple[str, str]:
     """Turns a failed Custom Search response into (reason, human_message).
 
     Reads only Google's structured error fields — never echoes `key` or `cx`,
     so this is safe to log in a public Actions run.
     """
-    reason, message = "", ""
+    reason, message, meta = "", "", {}
     try:
         err = (resp.json() or {}).get("error", {}) or {}
         message = str(err.get("message", "") or "")
@@ -114,12 +134,17 @@ def explain_cse_error(resp) -> tuple[str, str]:
             reason = str(details[0].get("reason", "") or "")
         if not reason:
             reason = str(err.get("status", "") or "")
+        meta = _error_metadata(err)
     except Exception:
         # Non-JSON error page (proxy, HTML 5xx); status code alone is the signal.
         message = (getattr(resp, "text", "") or "")[:200]
 
     remedy = _REMEDIES.get(reason.lower(), "")
     human = f"HTTP {getattr(resp, 'status_code', '?')} reason={reason or 'unknown'}: {message}"
+    if meta:
+        interesting = {k: meta[k] for k in ("service", "consumer", "activationUrl") if k in meta}
+        if interesting:
+            human += " | " + ", ".join(f"{k}={v}" for k, v in interesting.items())
     if remedy:
         human += f" | FIX: {remedy}"
     return reason, human
@@ -143,6 +168,14 @@ def check_credential_shape(api_key: str, cse_id: str) -> list[str]:
     problems: list[str] = []
     key = (api_key or "").strip()
     cx = (cse_id or "").strip()
+
+    # Google API keys are 39 chars. A short one is a truncated paste, which
+    # is invisible through GitHub's *** masking but breaks every call.
+    if key and key.startswith("AIza") and len(key) != 39:
+        problems.append(
+            f"GOOGLE_API_KEY is {len(key)} characters; a Google API key is 39. "
+            "The value looks truncated or has extra characters."
+        )
 
     if key and not key.startswith("AIza"):
         problems.append(
