@@ -214,12 +214,17 @@ sources:
     # are observed values. Add new ones by re-running that probe, never by
     # guessing.
     #
-    # Honest expectations: a 124-tenant sweep (19 Sep 2026) found only these
-    # four with UAE openings, and that day's postings were sales/marketing
-    # rather than engineering. No Gulf employer (ADNOC, Emaar, Aldar, Majid
-    # Al Futtaim, Emirates NBD, DP World, Etihad) runs a reachable Workday
-    # tenant at all. This is a small, cheap addition — roughly 20 requests a
-    # day — not a fix for AI-role coverage.
+    # Measured expectations, not hopes. A 124-tenant sweep (19 Sep 2026)
+    # found only four tenants with any UAE openings, and searching this
+    # candidate's AI/engineering terms across them returned ZERO UAE roles
+    # on the first live run — those employers' Dubai postings are sales and
+    # marketing. No Gulf employer (ADNOC, Emaar, Aldar, Majid Al Futtaim,
+    # Emirates NBD, DP World, Etihad) runs a reachable Workday tenant at all.
+    #
+    # Kept because it is verified-working infrastructure that costs 20
+    # requests a day and will pick up a Dubai AI role at these employers the
+    # day one is posted. It is not, and was never going to be, the fix for
+    # AI-role coverage — the job-alert-email route is.
     results_per_query: 20
     # Falls back to search.queries when unset; kept short since every term
     # costs one request per tenant.
@@ -234,10 +239,10 @@ sources:
       - {tenant: "thales",      shard: "wd3", site: "careers",            company: "Thales"}
       - {tenant: "crowdstrike", shard: "wd5", site: "CrowdstrikeCareers", company: "CrowdStrike"}
       - {tenant: "maersk",      shard: "wd3", site: "Maersk_Careers",     company: "Maersk"}
-      # API answers but showed no UAE rows in the sweep; kept because each
-      # costs only its own requests and the location filter drops non-UAE.
-      - {tenant: "redhat",      shard: "wd5", site: "Jobs",               company: "Red Hat"}
-      - {tenant: "paypal",      shard: "wd1", site: "Jobs",               company: "PayPal"}
+      # Dropped after the first live run: redhat/Jobs and paypal/Jobs answer
+      # the API but showed no UAE rows in either the discovery sweep or the
+      # live run, so they only cost requests. Re-add from
+      # scripts/probe_workday.py output if that changes.
   dubai_careers:
     enabled: true
     # Government of Dubai's Oracle Taleo portal (jobs.dubaicareers.ae).
