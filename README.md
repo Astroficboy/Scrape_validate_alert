@@ -94,6 +94,17 @@ four legitimate routes:
   most recent openings, which suits a daily run. See
   `scripts/check_boards.py`'s sibling `scripts/probe_taleo.py` if the parse
   ever breaks — it dumps the live page structure.
+- **Workday** (`src/scrapers/workday.py`) — Workday's public CXS JSON
+  endpoint needs no credentials and does not block datacenter traffic.
+  Tenants are discovered with `scripts/probe_workday.py`, since a public
+  Workday URL has three independent unknowns (tenant, `wdN` shard, site
+  slug). Set expectations honestly: a 124-tenant sweep found only four with
+  UAE openings, and no Gulf employer (ADNOC, Emaar, Aldar, Majid Al Futtaim,
+  Emirates NBD, DP World, Etihad) runs a reachable Workday tenant. This is a
+  cheap supplementary source, not a fix for AI-role coverage. Note it
+  searches your *role keywords* and filters results by location, not the
+  reverse — a Dubai AI role whose text never says "Dubai" is exactly the
+  case that matters.
 - **Greenhouse** / **Lever** — most tech companies' own ATS expose a public,
   unauthenticated JSON jobs API (`boards-api.greenhouse.io`, `api.lever.co`).
   `config.yaml`'s Greenhouse list is verified live (via `scripts/check_boards.py`,

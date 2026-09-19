@@ -206,6 +206,38 @@ sources:
     companies:
       - binance      # 292 jobs, 11 UAE
       - palantir     # 314 jobs, 4 UAE
+  workday:
+    enabled: true
+    # Workday's public CXS JSON endpoint. Every tenant below was confirmed
+    # answering by scripts/check_boards.py's sibling scripts/probe_workday.py
+    # — tenant, shard and site slug are three independent unknowns, so these
+    # are observed values. Add new ones by re-running that probe, never by
+    # guessing.
+    #
+    # Honest expectations: a 124-tenant sweep (19 Sep 2026) found only these
+    # four with UAE openings, and that day's postings were sales/marketing
+    # rather than engineering. No Gulf employer (ADNOC, Emaar, Aldar, Majid
+    # Al Futtaim, Emirates NBD, DP World, Etihad) runs a reachable Workday
+    # tenant at all. This is a small, cheap addition — roughly 20 requests a
+    # day — not a fix for AI-role coverage.
+    results_per_query: 20
+    # Falls back to search.queries when unset; kept short since every term
+    # costs one request per tenant.
+    search_terms:
+      - "artificial intelligence"
+      - "machine learning"
+      - "data scientist"
+      - "software engineer"
+      - "AI engineer"
+    tenants:
+      - {tenant: "visa",        shard: "wd5", site: "visa",               company: "Visa"}
+      - {tenant: "thales",      shard: "wd3", site: "careers",            company: "Thales"}
+      - {tenant: "crowdstrike", shard: "wd5", site: "CrowdstrikeCareers", company: "CrowdStrike"}
+      - {tenant: "maersk",      shard: "wd3", site: "Maersk_Careers",     company: "Maersk"}
+      # API answers but showed no UAE rows in the sweep; kept because each
+      # costs only its own requests and the location filter drops non-UAE.
+      - {tenant: "redhat",      shard: "wd5", site: "Jobs",               company: "Red Hat"}
+      - {tenant: "paypal",      shard: "wd1", site: "Jobs",               company: "PayPal"}
   dubai_careers:
     enabled: true
     # Government of Dubai's Oracle Taleo portal (jobs.dubaicareers.ae).
