@@ -479,6 +479,14 @@ doesn't grow forever.
   unrelated, or non-Dubai pages — the digest flags those postings as
   "targeted search — verify on click-through" rather than asserting the
   location as fact.
+- **Naukri Gulf cannot be scraped from CI** (measured 19 Sep 2026 by
+  `scripts/probe_naukrigulf.py`): all 22 probe attempts — four API endpoint
+  shapes x five app/system id header sets, plus the plain HTML search pages
+  — read-timed-out from a GitHub runner. The connection is accepted and then
+  never answered, which is silent datacenter-IP dropping rather than a
+  refusal that a different request could satisfy. Bayt does the same thing
+  more visibly (HTTP 403). This is precisely why the job-alert-email route
+  exists, and it is the only way Naukri Gulf listings can reach this system.
 - LinkedIn and Indeed are **not scraped directly** — both aggressively block
   automated/unauthenticated scraping. Instead, `src/scrapers/email_alerts.py`
   reads the board's own daily alert emails over IMAP (see setup step 1),

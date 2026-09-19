@@ -10,8 +10,21 @@ server-rendered listings, and that API is gated on app/system id headers
 rather than on a login. This probe works out which endpoint and header
 combination this deployment answers, before any scraper is written.
 
+RESULT (19 Sep 2026): negative, and conclusively so. All 22 attempts — four
+endpoint paths x five app/system id header sets, plus both plain HTML search
+pages — read-timed-out at 25s from a GitHub runner. Not 403, not a redirect,
+not an auth error: the TCP connection is accepted and the server then never
+responds, which is how datacenter IP ranges get dropped silently. No choice
+of endpoint, header or parse strategy gets around that, so Naukri Gulf
+cannot be scraped from CI. The job-alert-email route (IMAP) remains the only
+way to reach its listings.
+
+Kept in the repo rather than deleted so the negative result is on record and
+re-checkable — if Naukri ever stops dropping cloud traffic, re-running this
+workflow is how you would find out.
+
 Run via .github/workflows/probe-naukrigulf.yml — the dev sandbox's egress
-proxy blocks these hosts, GitHub runners reach them.
+proxy blocks these hosts, GitHub runners reach them (when the host allows).
 """
 
 from __future__ import annotations
